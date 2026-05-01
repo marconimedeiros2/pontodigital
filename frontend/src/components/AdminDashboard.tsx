@@ -487,32 +487,6 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
             <div className="admin-section-header"><h2>Relatório</h2></div>
 
             <div className="admin-card">
-              <div className="rel-quick-filters">
-                {[
-                  { label: 'Hoje',          days: 0  },
-                  { label: 'Ontem',         days: 1  },
-                  { label: 'Anteontem',     days: 2  },
-                  { label: 'Últimos 7 dias',  days: 6  },
-                  { label: 'Últimos 30 dias', days: 29 },
-                ].map(({ label, days }) => {
-                  const end   = new Date(); end.setDate(end.getDate());
-                  const start = new Date(); start.setDate(start.getDate() - days);
-                  const fmt = (d: Date) => d.toISOString().split('T')[0];
-                  const endStr   = fmt(end);
-                  const startStr = fmt(start);
-                  const active = relInicio === startStr && relFim === endStr;
-                  return (
-                    <button
-                      key={label}
-                      className={`rel-quick-btn${active ? ' rel-quick-btn--active' : ''}`}
-                      onClick={() => { setRelInicio(startStr); setRelFim(endStr); }}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-
               <div className="rel-filters">
                 <div className="input-group">
                   <label className="input-label">Data Inicial</label>
@@ -528,6 +502,32 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   onClick={handleRelatorio} disabled={relLoading}>
                   {relLoading ? <span className="spinner" /> : 'Buscar'}
                 </button>
+              </div>
+
+              <div className="rel-quick-filters">
+                {[
+                  { label: 'Hoje',            days: 0  },
+                  { label: 'Ontem',           days: 1  },
+                  { label: 'Anteontem',       days: 2  },
+                  { label: 'Últimos 7 dias',  days: 6  },
+                  { label: 'Últimos 30 dias', days: 29 },
+                ].map(({ label, days }) => {
+                  const end   = new Date();
+                  const start = new Date(); start.setDate(start.getDate() - days);
+                  const fmt = (d: Date) => d.toISOString().split('T')[0];
+                  const endStr   = fmt(end);
+                  const startStr = fmt(start);
+                  const active = relInicio === startStr && relFim === endStr;
+                  return (
+                    <button
+                      key={label}
+                      className={`rel-quick-btn${active ? ' rel-quick-btn--active' : ''}`}
+                      onClick={() => { setRelInicio(startStr); setRelFim(endStr); }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

@@ -302,7 +302,7 @@ code {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-top: 16px;
 }
 
 .rel-quick-btn {

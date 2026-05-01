@@ -182,11 +182,13 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   // Relatório state
   const [relInicio, setRelInicio] = useState(today);
   const [relFim, setRelFim] = useState(today);
-  const [relData, setRelData] = useState<RegistroAdmin[]>([]);
+  const [relDataAll, setRelDataAll] = useState<RegistroAdmin[]>([]); // todos (visíveis + ocultos)
   const [relLoading, setRelLoading] = useState(false);
   const [relSelected, setRelSelected] = useState<Set<number>>(new Set());
-  const [ocultosCount, setOcultosCount] = useState(0);
   const [mostrarOcultos, setMostrarOcultos] = useState(false);
+
+  const ocultosCount = relDataAll.filter((r) => r.oculto).length;
+  const relData = mostrarOcultos ? relDataAll : relDataAll.filter((r) => !r.oculto);
 
   // Config state
   const [senhaAtual, setSenhaAtual] = useState('');
@@ -239,26 +241,18 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     try { await adminApi.deleteUsuario(pin); await loadUsuarios(); } catch { /* ignore */ }
   };
 
-  const fetchRelatorio = async (ocultos: boolean) => {
+  const handleRelatorio = async () => {
     setRelLoading(true);
     setRelSelected(new Set());
+    setMostrarOcultos(false);
     try {
-      const data = await adminApi.getRelatorio(relInicio || undefined, relFim || undefined, ocultos);
-      setRelData(data.registros);
-      setOcultosCount(data.ocultosCount);
+      // Sempre busca todos (visíveis + ocultos) — filtragem é feita no frontend
+      const data = await adminApi.getRelatorio(relInicio || undefined, relFim || undefined, true);
+      setRelDataAll(data.registros);
     } catch { /* ignore */ } finally { setRelLoading(false); }
   };
 
-  const handleRelatorio = () => {
-    setMostrarOcultos(false);
-    fetchRelatorio(false);
-  };
-
-  const handleToggleOcultos = () => {
-    const next = !mostrarOcultos;
-    setMostrarOcultos(next);
-    fetchRelatorio(next);
-  };
+  const handleToggleOcultos = () => setMostrarOcultos((v) => !v);
 
   const toggleRelSelect = (id: number) =>
     setRelSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });

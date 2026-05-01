@@ -5,8 +5,7 @@ node_modules/
 dist/
 build/
 
-# Environment variables (NUNCA comitar)
-.env
+# Environment variables
 .env.local
 .env.*.local
 

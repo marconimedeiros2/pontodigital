@@ -330,6 +330,29 @@ code {
 
 .rel-filters { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
 
+/* Ocultar selecionados */
+.btn-delete-selected {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 8px;
+  padding: 0 14px;
+  height: 36px;
+  color: #dc2626;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.btn-delete-selected:hover { background: #fee2e2; }
+
+[data-theme='dark'] .btn-delete-selected { background: #3f1212; border-color: #7f1d1d; color: #fca5a5; }
+[data-theme='dark'] .btn-delete-selected:hover { background: #7f1d1d; }
+
 /* Action buttons */
 .action-btns { display: flex; gap: 6px; }
 

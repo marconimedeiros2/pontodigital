@@ -1,0 +1,260 @@
+import { Router, Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
+import { db } from '../database/db';
+
+const router = Router();
+
+const sessions = new Map<string, number>();
+const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+
+function generateToken(): string {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+function isValidToken(token: string): boolean {
+  const exp = sessions.get(token);
+  if (!exp) return false;
+  if (Date.now() > exp) {
+    sessions.delete(token);
+    return false;
+  }
+  return true;
+}
+
+export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token || !isValidToken(token)) {
+    res.status(401).json({ error: 'Não autorizado.' });
+    return;
+  }
+  next();
+}
+
+// POST /api/admin/login
+router.post('/login', async (req: Request, res: Response) => {
+  const { senha } = req.body as { senha?: string };
+
+  if (!senha || typeof senha !== 'string') {
+    return res.status(400).json({ error: 'Senha obrigatória.' });
+  }
+
+  try {
+    const ok = await db.checkPassword(senha);
+    if (!ok) {
+      return res.status(401).json({ error: 'Senha incorreta.' });
+    }
+
+    const token = generateToken();
+    sessions.set(token, Date.now() + SESSION_TTL_MS);
+    return res.json({ token });
+  } catch (err) {
+    console.error('[POST /login]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// POST /api/admin/logout
+router.post('/logout', authMiddleware, (req: Request, res: Response) => {
+  const token = req.headers.authorization?.replace('Bearer ', '') ?? '';
+  sessions.delete(token);
+  return res.json({ ok: true });
+});
+
+// POST /api/admin/senha
+router.post('/senha', authMiddleware, async (req: Request, res: Response) => {
+  const { senhaAtual, novaSenha } = req.body as { senhaAtual?: string; novaSenha?: string };
+
+  if (!senhaAtual || !novaSenha) {
+    return res.status(400).json({ error: 'senhaAtual e novaSenha são obrigatórios.' });
+  }
+
+  if (novaSenha.length < 4) {
+    return res.status(400).json({ error: 'Nova senha deve ter ao menos 4 caracteres.' });
+  }
+
+  try {
+    const ok = await db.checkPassword(senhaAtual);
+    if (!ok) {
+      return res.status(401).json({ error: 'Senha atual incorreta.' });
+    }
+
+    await db.changePassword(novaSenha);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[POST /senha]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// GET /api/admin/dashboard?data=YYYY-MM-DD
+router.get('/dashboard', authMiddleware, async (req: Request, res: Response) => {
+  const data = (req.query.data as string) || getTodayDate();
+
+  try {
+    const [registros, usuarios] = await Promise.all([
+      db.findByDate(data),
+      db.listUsuarios(),
+    ]);
+
+    const usuariosMap = Object.fromEntries(usuarios.map((u) => [u.id, u]));
+
+    const enriched = registros.map((r) => ({
+      ...r,
+      nome: usuariosMap[r.usuario_id]?.nome ?? `PIN ${r.pin}`,
+      completo:
+        r.hora_inicial !== null &&
+        r.inicio_intervalo !== null &&
+        r.fim_intervalo !== null &&
+        r.hora_final !== null,
+    }));
+
+    const stats = {
+      total: enriched.length,
+      presentes: enriched.filter((r) => r.hora_inicial !== null).length,
+      emIntervalo: enriched.filter(
+        (r) => r.inicio_intervalo !== null && r.fim_intervalo === null
+      ).length,
+      saiu: enriched.filter((r) => r.hora_final !== null).length,
+      completos: enriched.filter((r) => r.completo).length,
+    };
+
+    return res.json({ data, registros: enriched, stats });
+  } catch (err) {
+    console.error('[GET /dashboard]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// GET /api/admin/relatorio?inicio=YYYY-MM-DD&fim=YYYY-MM-DD
+router.get('/relatorio', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const [registros, usuarios] = await Promise.all([
+      db.findAll(500),
+      db.listUsuarios(),
+    ]);
+
+    const usuariosMap = Object.fromEntries(usuarios.map((u) => [u.id, u]));
+    const { inicio, fim } = req.query as { inicio?: string; fim?: string };
+
+    const filtered = registros.filter((r) => {
+      if (inicio && r.data < inicio) return false;
+      if (fim && r.data > fim) return false;
+      return true;
+    });
+
+    const enriched = filtered.map((r) => ({
+      ...r,
+      nome: usuariosMap[r.usuario_id]?.nome ?? `PIN ${r.pin}`,
+      completo:
+        r.hora_inicial !== null &&
+        r.inicio_intervalo !== null &&
+        r.fim_intervalo !== null &&
+        r.hora_final !== null,
+    }));
+
+    return res.json({ registros: enriched });
+  } catch (err) {
+    console.error('[GET /relatorio]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// GET /api/admin/usuarios
+router.get('/usuarios', authMiddleware, async (_req: Request, res: Response) => {
+  try {
+    const usuarios = await db.listUsuarios();
+    return res.json({ usuarios });
+  } catch (err) {
+    console.error('[GET /usuarios]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// POST /api/admin/usuarios
+router.post('/usuarios', authMiddleware, async (req: Request, res: Response) => {
+  const { pin, nome } = req.body as { pin?: string; nome?: string };
+
+  if (!pin || !/^\d{4,6}$/.test(pin)) {
+    return res.status(400).json({ error: 'PIN inválido (4-6 dígitos numéricos).' });
+  }
+
+  if (!nome || nome.trim().length < 2) {
+    return res.status(400).json({ error: 'Nome inválido (mínimo 2 caracteres).' });
+  }
+
+  try {
+    const existing = await db.findUsuario(pin);
+    if (existing) {
+      return res.status(409).json({ error: 'PIN já cadastrado.' });
+    }
+
+    const usuario = await db.createUsuario(pin, nome.trim());
+    return res.status(201).json({ usuario });
+  } catch (err) {
+    console.error('[POST /usuarios]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// PUT /api/admin/usuarios/:pin
+router.put('/usuarios/:pin', authMiddleware, async (req: Request, res: Response) => {
+  const { pin } = req.params;
+  const { nome, ativo, novoPin } = req.body as { nome?: string; ativo?: boolean; novoPin?: string };
+
+  try {
+    const existing = await db.findUsuario(pin);
+    if (!existing) {
+      return res.status(404).json({ error: 'Usuário não encontrado.' });
+    }
+
+    if (novoPin !== undefined) {
+      if (!/^\d{4,6}$/.test(novoPin)) {
+        return res.status(400).json({ error: 'Novo PIN inválido (4-6 dígitos numéricos).' });
+      }
+      if (novoPin !== pin) {
+        const conflict = await db.findUsuario(novoPin);
+        if (conflict) {
+          return res.status(409).json({ error: 'Novo PIN já está em uso por outro funcionário.' });
+        }
+      }
+      const updated = await db.changeUserPin(pin, novoPin, nome?.trim(), ativo);
+      return res.json({ usuario: updated });
+    }
+
+    const fields: Partial<Pick<import('../database/db').Usuario, 'nome' | 'ativo'>> = {};
+    if (nome !== undefined) fields.nome = nome.trim();
+    if (ativo !== undefined) fields.ativo = ativo;
+
+    const updated = await db.updateUsuario(existing.id, fields);
+    return res.json({ usuario: updated });
+  } catch (err) {
+    console.error('[PUT /usuarios/:pin]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// DELETE /api/admin/usuarios/:pin
+router.delete('/usuarios/:pin', authMiddleware, async (req: Request, res: Response) => {
+  const { pin } = req.params;
+
+  try {
+    const deleted = await db.deleteUsuario(pin);
+    if (!deleted) {
+      return res.status(404).json({ error: 'Usuário não encontrado.' });
+    }
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[DELETE /usuarios/:pin]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+function getTodayDate(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+export default router;

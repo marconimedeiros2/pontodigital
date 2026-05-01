@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Clock } from './components/Clock';
 import { PinDisplay } from './components/PinDisplay';
 import { NumericKeypad } from './components/NumericKeypad';
-import { ProgressSteps } from './components/ProgressSteps';
+// import { ProgressSteps } from './components/ProgressSteps';
 import { SuccessModal } from './components/SuccessModal';
 import { HistoryView } from './components/HistoryView';
 import { AdminDashboard } from './components/AdminDashboard';
@@ -22,7 +22,7 @@ export default function App() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState<RegistroResponse | null>(null);
   const [darkMode, setDarkMode] = useState(false);
-  const [registro, setRegistro] = useState<Registro | null>(null);
+  // const [registro, setRegistro] = useState<Registro | null>(null);
   const [proximaEtapa, setProximaEtapa] = useState<TipoRegistro | null>(null);
 
   // Status drawer
@@ -86,7 +86,7 @@ export default function App() {
         const result = await api.registrar(pin);
         if (result.error) { setError(result.error); triggerShake(); setPin(''); return; }
         setSuccess(result);
-        setRegistro(null);
+        // setRegistro(null);
         setProximaEtapa(result.proximaEtapa);
         setPin('');
       } catch (e) {
@@ -101,7 +101,7 @@ export default function App() {
 
   const handleSuccessClose = () => {
     setSuccess(null);
-    setRegistro(null);
+    // setRegistro(null);
     setProximaEtapa(null);
   };
 

@@ -298,6 +298,36 @@ code {
   align-items: flex-end;
 }
 
+.rel-quick-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.rel-quick-btn {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.rel-quick-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.rel-quick-btn--active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
 .rel-filters { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
 
 /* Action buttons */

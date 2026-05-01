@@ -184,6 +184,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [relFim, setRelFim] = useState(today);
   const [relData, setRelData] = useState<RegistroAdmin[]>([]);
   const [relLoading, setRelLoading] = useState(false);
+  const [relSelected, setRelSelected] = useState<Set<number>>(new Set());
 
   // Config state
   const [senhaAtual, setSenhaAtual] = useState('');
@@ -238,10 +239,25 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
 
   const handleRelatorio = async () => {
     setRelLoading(true);
+    setRelSelected(new Set());
     try {
       const data = await adminApi.getRelatorio(relInicio || undefined, relFim || undefined);
       setRelData(data.registros);
     } catch { /* ignore */ } finally { setRelLoading(false); }
+  };
+
+  const toggleRelSelect = (id: number) =>
+    setRelSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const allRelSelected = relData.length > 0 && relSelected.size === relData.length;
+  const toggleAllRel = () =>
+    setRelSelected(allRelSelected ? new Set() : new Set(relData.map((r) => r.id)));
+
+  const handleHideSelected = async () => {
+    if (!confirm(`Ocultar ${relSelected.size} registro(s) selecionado(s)?`)) return;
+    await Promise.all([...relSelected].map((id) => adminApi.hideRegistro(id).catch(() => {})));
+    setRelData((prev) => prev.filter((r) => !relSelected.has(r.id)));
+    setRelSelected(new Set());
   };
 
   const exportCSV = (registros: RegistroAdmin[], prefix = 'relatorio') => {
@@ -535,16 +551,36 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               <>
                 <div className="admin-table-actions">
                   <span className="history-count">{relData.length} registros</span>
-                  <ExportButtons registros={relData} prefix="relatorio" />
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    {relSelected.size > 0 && (
+                      <button className="btn-delete-selected" onClick={handleHideSelected}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                        </svg>
+                        Ocultar {relSelected.size} selecionado{relSelected.size > 1 ? 's' : ''}
+                      </button>
+                    )}
+                    <ExportButtons registros={relData} prefix="relatorio" />
+                  </div>
                 </div>
                 <div className="admin-table-wrap">
                   <table className="admin-table">
                     <thead>
-                      <tr><th>Data</th><th>Funcionário</th><th>Entrada</th><th>Iníc. Int.</th><th>Fim Int.</th><th>Saída</th><th>Trabalhado</th><th>Status</th></tr>
+                      <tr>
+                        <th style={{ width: 36 }}>
+                          <input type="checkbox" className="rel-checkbox"
+                            checked={allRelSelected} onChange={toggleAllRel} />
+                        </th>
+                        <th>Data</th><th>Funcionário</th><th>Entrada</th><th>Iníc. Int.</th><th>Fim Int.</th><th>Saída</th><th>Trabalhado</th><th>Status</th>
+                      </tr>
                     </thead>
                     <tbody>
                       {relData.map((r) => (
-                        <tr key={r.id}>
+                        <tr key={r.id} className={relSelected.has(r.id) ? 'rel-row--selected' : ''}>
+                          <td>
+                            <input type="checkbox" className="rel-checkbox"
+                              checked={relSelected.has(r.id)} onChange={() => toggleRelSelect(r.id)} />
+                          </td>
                           <td>{formatDate(r.data)}</td>
                           <td className="td-nome">{r.nome}</td>
                           <td>{r.hora_inicial || '—'}</td>

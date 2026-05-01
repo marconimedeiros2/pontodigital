@@ -92,6 +92,9 @@ export const adminApi = {
   deleteUsuario: (pin: string) =>
     request<{ ok: boolean }>(`${BASE}/usuarios/${pin}`, { method: 'DELETE' }),
 
+  hideRegistro: (id: number) =>
+    request<{ ok: boolean }>(`${BASE}/registros/${id}`, { method: 'DELETE' }),
+
   saveToken: (token: string) => sessionStorage.setItem('admin_token', token),
   clearToken: () => sessionStorage.removeItem('admin_token'),
   hasToken: () => !!sessionStorage.getItem('admin_token'),

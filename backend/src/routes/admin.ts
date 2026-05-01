@@ -233,6 +233,22 @@ router.put('/usuarios/:pin', authMiddleware, async (req: Request, res: Response)
   }
 });
 
+// DELETE /api/admin/registros/:id  (soft delete — marca como oculto)
+router.delete('/registros/:id', authMiddleware, async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: 'ID inválido.' });
+  }
+  try {
+    const hidden = await db.hideRecord(id);
+    if (!hidden) return res.status(404).json({ error: 'Registro não encontrado.' });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[DELETE /registros/:id]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
 // DELETE /api/admin/usuarios/:pin
 router.delete('/usuarios/:pin', authMiddleware, async (req: Request, res: Response) => {
   const { pin } = req.params;

@@ -10,6 +10,7 @@ export interface Registro {
   inicio_intervalo: string | null;
   fim_intervalo: string | null;
   hora_final: string | null;
+  oculto: boolean;
   created_at: string;
 }
 
@@ -37,12 +38,24 @@ export const db = {
       .from('registros')
       .select('*')
       .eq('usuario_id', usuarioId)
+      .eq('oculto', false)
       .is('hora_final', null)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
     if (error) raise(error, 'findLatestIncomplete');
     return row ?? undefined;
+  },
+
+  async hideRecord(id: number): Promise<boolean> {
+    const { error, data } = await supabase
+      .from('registros')
+      .update({ oculto: true })
+      .eq('id', id)
+      .select('id')
+      .maybeSingle();
+    if (error) raise(error, 'hideRecord');
+    return data !== null;
   },
 
   async insertRecord(
@@ -79,6 +92,7 @@ export const db = {
       .from('registros')
       .select('*')
       .eq('usuario_id', usuarioId)
+      .eq('oculto', false)
       .order('created_at', { ascending: false })
       .limit(limit);
     if (error) raise(error, 'findByUsuarioId');
@@ -90,6 +104,7 @@ export const db = {
       .from('registros')
       .select('*')
       .eq('data', data)
+      .eq('oculto', false)
       .order('created_at', { ascending: true });
     if (error) raise(error, 'findByDate');
     return (rows ?? []) as Registro[];
@@ -99,6 +114,7 @@ export const db = {
     const { data, error } = await supabase
       .from('registros')
       .select('*')
+      .eq('oculto', false)
       .order('data', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(limit);

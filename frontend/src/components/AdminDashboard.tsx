@@ -587,7 +587,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                         Ocultar {relSelected.size} selecionado{relSelected.size > 1 ? 's' : ''}
                       </button>
                     )}
-                    <ExportButtons registros={relData} prefix="relatorio" />
+                    <ExportButtons registros={relDataAll} prefix="relatorio" />
                   </div>
                 </div>
                 <div className="admin-table-wrap">

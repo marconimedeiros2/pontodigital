@@ -152,9 +152,10 @@ function formatDate(d: string) {
 }
 
 function StatusBadge({ reg }: { reg: RegistroAdmin }) {
-  if (reg.hora_final) return <span className="badge badge--saiu">Saiu</span>;
-  if (reg.inicio_intervalo && !reg.fim_intervalo) return <span className="badge badge--intervalo">Intervalo</span>;
-  if (reg.hora_inicial) return <span className="badge badge--presente">Presente</span>;
+  if (reg.hora_final)                                    return <span className="badge badge--saiu">Saída</span>;
+  if (reg.fim_intervalo)                                 return <span className="badge badge--presente">Fim do Intervalo</span>;
+  if (reg.inicio_intervalo && !reg.fim_intervalo)        return <span className="badge badge--intervalo">Início do Intervalo</span>;
+  if (reg.hora_inicial)                                  return <span className="badge badge--presente">Entrada</span>;
   return <span className="badge badge--ausente">Ausente</span>;
 }
 

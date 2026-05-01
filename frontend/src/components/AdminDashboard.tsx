@@ -158,6 +158,8 @@ function StatusBadge({ reg }: { reg: RegistroAdmin }) {
   return <span className="badge badge--ausente">Ausente</span>;
 }
 
+const today = new Date().toISOString().split('T')[0];
+
 export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [tab, setTab] = useState<AdminTab>('dashboard');
 
@@ -178,8 +180,8 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [editingUsuario, setEditingUsuario] = useState<Usuario | null>(null);
 
   // Relatório state
-  const [relInicio, setRelInicio] = useState('');
-  const [relFim, setRelFim] = useState('');
+  const [relInicio, setRelInicio] = useState(today);
+  const [relFim, setRelFim] = useState(today);
   const [relData, setRelData] = useState<RegistroAdmin[]>([]);
   const [relLoading, setRelLoading] = useState(false);
 
@@ -241,8 +243,6 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
       setRelData(data.registros);
     } catch { /* ignore */ } finally { setRelLoading(false); }
   };
-
-  const today = new Date().toISOString().split('T')[0];
 
   const exportCSV = (registros: RegistroAdmin[], prefix = 'relatorio') => {
     const header = 'Data,Funcionário,PIN,Entrada,Início Intervalo,Fim Intervalo,Saída,Horas Trabalhadas,Status\n';

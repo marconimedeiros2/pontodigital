@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { adminApi, type RegistroAdmin, type DashboardStats, type Usuario } from '../services/adminApi';
 import { STEP_LABELS } from '../types';
 import { exportToXlsx } from '../utils/exportXlsx';
@@ -166,6 +166,175 @@ function StatusBadge({ reg }: { reg: RegistroAdmin }) {
   return <span className="badge badge--ausente">Ausente</span>;
 }
 
+function SearchableSelect({ options, value, onChange, placeholder }: {
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setSearch(''); }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const filtered = options.filter((o) =>
+    o.label.toLowerCase().includes(search.toLowerCase()) || o.value.includes(search)
+  );
+  const selected = options.find((o) => o.value === value);
+
+  return (
+    <div className="ss-wrap" ref={ref}>
+      <button type="button" className="ss-trigger" onClick={() => setOpen((v) => !v)}>
+        <span>{selected ? `${selected.label}` : (placeholder ?? 'Selecione...')}</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+      {open && (
+        <div className="ss-dropdown">
+          <input
+            type="text" className="ss-search" autoFocus placeholder="Buscar..."
+            value={search} onChange={(e) => setSearch(e.target.value)}
+          />
+          <div className="ss-options">
+            {filtered.length === 0
+              ? <div className="ss-empty">Nenhum resultado</div>
+              : filtered.map((o) => (
+                <div
+                  key={o.value}
+                  className={`ss-option${value === o.value ? ' ss-option--selected' : ''}`}
+                  onClick={() => { onChange(o.value); setOpen(false); setSearch(''); }}
+                >
+                  <span>{o.label}</span>
+                  <code style={{ fontSize: '0.75rem', opacity: 0.6 }}>{o.value}</code>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AddRegistroModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const [usuariosOpts, setUsuariosOpts] = useState<{ value: string; label: string }[]>([]);
+  const [pin, setPin] = useState('');
+  const [data, setData] = useState(new Date().toISOString().split('T')[0]);
+  const [entrada, setEntrada] = useState('');
+  const [iniInt, setIniInt] = useState('');
+  const [fimInt, setFimInt] = useState('');
+  const [saida, setSaida] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    adminApi.listUsuarios()
+      .then((d) => setUsuariosOpts(d.usuarios.filter((u) => u.ativo).map((u) => ({ value: u.pin, label: u.nome }))))
+      .catch(() => {})
+      .finally(() => setLoadingUsers(false));
+  }, []);
+
+  const toDbVal = (t: string) => t ? `${data} ${t}:00` : null;
+
+  const handleSave = async () => {
+    setError('');
+    if (!pin) { setError('Selecione um funcionário.'); return; }
+    if (!data) { setError('Data é obrigatória.'); return; }
+    setLoading(true);
+    try {
+      await adminApi.createRegistro(pin, data, {
+        hora_inicial:     toDbVal(entrada) as string | null,
+        inicio_intervalo: toDbVal(iniInt)  as string | null,
+        fim_intervalo:    toDbVal(fimInt)  as string | null,
+        hora_final:       toDbVal(saida)   as string | null,
+      });
+      onSaved();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro ao criar registro');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" style={{ textAlign: 'left', maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+        <h2 className="modal-title" style={{ textAlign: 'left', fontSize: '1.15rem', marginBottom: 20 }}>
+          Novo Registro
+        </h2>
+
+        {loadingUsers ? (
+          <div className="admin-loading"><span className="spinner" /></div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div className="input-group">
+              <label className="input-label">Funcionário</label>
+              <SearchableSelect
+                options={usuariosOpts}
+                value={pin}
+                onChange={setPin}
+                placeholder="Selecione o funcionário..."
+              />
+            </div>
+
+            <div className="input-group">
+              <label className="input-label">Data</label>
+              <input type="date" className="text-input" value={data} onChange={(e) => setData(e.target.value)} />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              {([
+                ['Entrada',         entrada, setEntrada],
+                ['Início Intervalo', iniInt, setIniInt],
+                ['Fim Intervalo',    fimInt, setFimInt],
+                ['Saída',            saida,  setSaida],
+              ] as [string, string, (v: string) => void][]).map(([label, val, setter]) => (
+                <div className="input-group" key={label}>
+                  <label className="input-label">{label}</label>
+                  <input type="time" className="text-input" value={val} onChange={(e) => setter(e.target.value)} />
+                </div>
+              ))}
+            </div>
+
+            {error && (
+              <div className="error-banner">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                {error}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+              <button
+                className="confirm-btn"
+                style={{ background: 'var(--keypad-btn-bg)', color: 'var(--text)', boxShadow: 'none', border: '1px solid var(--border)', flex: 1 }}
+                onClick={onClose} disabled={loading}
+              >
+                Cancelar
+              </button>
+              <button className="confirm-btn" style={{ flex: 1 }} onClick={handleSave} disabled={loading}>
+                {loading ? <span className="spinner" /> : 'Criar Registro'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const today = new Date().toISOString().split('T')[0];
 
 type TimeField = 'hora_inicial' | 'inicio_intervalo' | 'fim_intervalo' | 'hora_final';
@@ -240,6 +409,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [relLoading, setRelLoading] = useState(false);
   const [relSelected, setRelSelected] = useState<Set<number>>(new Set());
   const [mostrarOcultos, setMostrarOcultos] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const ocultosCount = relDataAll.filter((r) => r.oculto).length;
   const relData = mostrarOcultos ? relDataAll : relDataAll.filter((r) => !r.oculto);
@@ -319,6 +489,20 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     if (!confirm(`Ocultar ${relSelected.size} registro(s) selecionado(s)?`)) return;
     await Promise.all([...relSelected].map((id) => adminApi.hideRegistro(id).catch(() => {})));
     setRelDataAll((prev) => prev.map((r) => relSelected.has(r.id) ? { ...r, oculto: true } : r));
+    setRelSelected(new Set());
+  };
+
+  const handleRestoreRegistro = async (id: number) => {
+    await adminApi.restoreRegistro(id);
+    setRelDataAll((prev) => prev.map((r) => r.id === id ? { ...r, oculto: false } : r));
+  };
+
+  const selectedOcultos = [...relSelected].filter((id) => relDataAll.find((r) => r.id === id)?.oculto);
+
+  const handleRestoreSelected = async () => {
+    if (!confirm(`Desocultar ${selectedOcultos.length} registro(s)?`)) return;
+    await Promise.all(selectedOcultos.map((id) => adminApi.restoreRegistro(id).catch(() => {})));
+    setRelDataAll((prev) => prev.map((r) => selectedOcultos.includes(r.id) ? { ...r, oculto: false } : r));
     setRelSelected(new Set());
   };
 
@@ -572,7 +756,21 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
         {/* ── RELATÓRIO ── */}
         {tab === 'relatorio' && (
           <div className="admin-section">
-            <div className="admin-section-header"><h2>Relatório</h2></div>
+            {showAddModal && (
+              <AddRegistroModal
+                onClose={() => setShowAddModal(false)}
+                onSaved={() => { if (relDataAll.length > 0) handleRelatorio(); }}
+              />
+            )}
+            <div className="admin-section-header">
+              <h2>Relatório</h2>
+              <button className="btn-novo-registro" onClick={() => setShowAddModal(true)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Novo Registro
+              </button>
+            </div>
 
             <div className="admin-card">
               <div className="rel-filters">
@@ -643,12 +841,21 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    {relSelected.size > 0 && (
+                    {selectedOcultos.length > 0 && (
+                      <button className="btn-restore btn-restore--bulk" onClick={handleRestoreSelected}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                          <path d="M3 3v5h5"/>
+                        </svg>
+                        Desocultar {selectedOcultos.length} selecionado{selectedOcultos.length > 1 ? 's' : ''}
+                      </button>
+                    )}
+                    {relSelected.size > 0 && relSelected.size > selectedOcultos.length && (
                       <button className="btn-delete-selected" onClick={handleHideSelected}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
                         </svg>
-                        Ocultar {relSelected.size} selecionado{relSelected.size > 1 ? 's' : ''}
+                        Ocultar {relSelected.size - selectedOcultos.length} selecionado{relSelected.size - selectedOcultos.length > 1 ? 's' : ''}
                       </button>
                     )}
                     <ExportButtons registros={relDataAll} prefix="relatorio" />
@@ -662,7 +869,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                           <input type="checkbox" className="rel-checkbox"
                             checked={allRelSelected} onChange={toggleAllRel} />
                         </th>
-                        <th>Data</th><th>Funcionário</th><th>Entrada</th><th>Iníc. Int.</th><th>Fim Int.</th><th>Saída</th><th>Trabalhado</th><th>Status</th>
+                        <th>Data</th><th>Funcionário</th><th>Entrada</th><th>Iníc. Int.</th><th>Fim Int.</th><th>Saída</th><th>Trabalhado</th><th>Status</th><th></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -684,6 +891,17 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                           ))}
                           <td><strong>{calcWorkTime(r)}</strong></td>
                           <td><StatusBadge reg={r} /></td>
+                          <td>
+                            {r.oculto && (
+                              <button className="btn-restore" onClick={() => handleRestoreRegistro(r.id)} title="Restaurar">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                  <path d="M3 3v5h5"/>
+                                </svg>
+                                Restaurar
+                              </button>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

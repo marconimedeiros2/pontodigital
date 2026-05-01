@@ -96,11 +96,27 @@ export const adminApi = {
 
   updateRegistro: (
     id: number,
-    fields: Partial<Pick<RegistroAdmin, 'hora_inicial' | 'inicio_intervalo' | 'fim_intervalo' | 'hora_final'>>
+    fields: Partial<Pick<RegistroAdmin, 'hora_inicial' | 'inicio_intervalo' | 'fim_intervalo' | 'hora_final'> & { oculto: boolean }>
   ) =>
     request<{ ok: boolean }>(`${BASE}/registros/${id}`, {
       method: 'PUT',
       body: JSON.stringify(fields),
+    }),
+
+  restoreRegistro: (id: number) =>
+    request<{ ok: boolean }>(`${BASE}/registros/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ oculto: false }),
+    }),
+
+  createRegistro: (
+    pin: string,
+    data: string,
+    fields: Partial<Pick<RegistroAdmin, 'hora_inicial' | 'inicio_intervalo' | 'fim_intervalo' | 'hora_final'>>
+  ) =>
+    request<{ ok: boolean; id: number }>(`${BASE}/registros`, {
+      method: 'POST',
+      body: JSON.stringify({ pin, data, ...fields }),
     }),
 
   hideRegistro: (id: number) =>

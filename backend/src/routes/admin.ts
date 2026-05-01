@@ -247,10 +247,13 @@ router.put('/registros/:id', authMiddleware, async (req: Request, res: Response)
     return res.status(400).json({ error: 'ID inválido.' });
   }
 
-  const allowed = ['hora_inicial', 'inicio_intervalo', 'fim_intervalo', 'hora_final'] as const;
-  const fields: Partial<Record<typeof allowed[number], string | null>> = {};
-  for (const f of allowed) {
+  const timeFields = ['hora_inicial', 'inicio_intervalo', 'fim_intervalo', 'hora_final'] as const;
+  const fields: Record<string, string | null | boolean> = {};
+  for (const f of timeFields) {
     if (f in req.body) fields[f] = req.body[f] ?? null;
+  }
+  if ('oculto' in req.body && typeof req.body.oculto === 'boolean') {
+    fields['oculto'] = req.body.oculto;
   }
 
   if (Object.keys(fields).length === 0) {
@@ -258,10 +261,42 @@ router.put('/registros/:id', authMiddleware, async (req: Request, res: Response)
   }
 
   try {
-    await db.updateById(id, fields);
+    await db.updateById(id, fields as Parameters<typeof db.updateById>[1]);
     return res.json({ ok: true });
   } catch (err) {
     console.error('[PUT /registros/:id]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// POST /api/admin/registros  (criar novo registro)
+router.post('/registros', authMiddleware, async (req: Request, res: Response) => {
+  const { pin, data, hora_inicial, inicio_intervalo, fim_intervalo, hora_final } = req.body as {
+    pin?: string; data?: string;
+    hora_inicial?: string; inicio_intervalo?: string; fim_intervalo?: string; hora_final?: string;
+  };
+
+  if (!pin || typeof pin !== 'string') {
+    return res.status(400).json({ error: 'PIN é obrigatório.' });
+  }
+  if (!data || !/^\d{4}-\d{2}-\d{2}$/.test(data)) {
+    return res.status(400).json({ error: 'Data inválida (YYYY-MM-DD).' });
+  }
+
+  try {
+    const usuario = await db.findUsuario(pin);
+    if (!usuario) return res.status(404).json({ error: 'Funcionário não encontrado.' });
+
+    const registro = await db.insertRecord(usuario.id, pin, data, {
+      hora_inicial:      hora_inicial      || null,
+      inicio_intervalo:  inicio_intervalo  || null,
+      fim_intervalo:     fim_intervalo     || null,
+      hora_final:        hora_final        || null,
+    });
+
+    return res.status(201).json({ ok: true, id: registro.id });
+  } catch (err) {
+    console.error('[POST /registros]', err);
     return res.status(500).json({ error: 'Erro interno.' });
   }
 });

@@ -6,9 +6,10 @@ import { ProgressSteps } from './components/ProgressSteps';
 import { SuccessModal } from './components/SuccessModal';
 import { HistoryView } from './components/HistoryView';
 import { AdminDashboard } from './components/AdminDashboard';
+import { PinStatusDrawer } from './components/PinStatusDrawer';
 import { api } from './services/api';
 import { adminApi } from './services/adminApi';
-import type { View, TipoRegistro, Registro, RegistroResponse } from './types';
+import type { View, TipoRegistro, Registro, RegistroResponse, HojeResponse } from './types';
 import { STEP_LABELS } from './types';
 
 export default function App() {
@@ -23,6 +24,14 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [registro, setRegistro] = useState<Registro | null>(null);
   const [proximaEtapa, setProximaEtapa] = useState<TipoRegistro | null>(null);
+
+  // Status drawer
+  const [showStatus, setShowStatus] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [statusHoje, setStatusHoje] = useState<HojeResponse | null>(null);
+  const [statusHistorico, setStatusHistorico] = useState<Registro[]>([]);
+  const [statusPin, setStatusPin] = useState('');
+  const [statusError, setStatusError] = useState('');
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
@@ -96,6 +105,28 @@ export default function App() {
     setProximaEtapa(null);
   };
 
+  const handleShowStatus = async () => {
+    if (pin.length < 4) return;
+    setStatusPin(pin);
+    setStatusError('');
+    setStatusHoje(null);
+    setStatusHistorico([]);
+    setShowStatus(true);
+    setStatusLoading(true);
+    try {
+      const [hoje, hist] = await Promise.all([
+        api.getHoje(pin),
+        api.getHistorico(pin),
+      ]);
+      setStatusHoje(hoje);
+      setStatusHistorico(hist.registros.slice(0, 10));
+    } catch (e) {
+      setStatusError(e instanceof Error ? e.message : 'Erro ao carregar dados');
+    } finally {
+      setStatusLoading(false);
+    }
+  };
+
   if (view === 'admin') {
     return (
       <div className="app" data-theme={darkMode ? 'dark' : 'light'}>
@@ -115,6 +146,16 @@ export default function App() {
   return (
     <div className="app">
       {success && <SuccessModal result={success} onClose={handleSuccessClose} />}
+      {showStatus && (
+        <PinStatusDrawer
+          pin={statusPin}
+          loading={statusLoading}
+          hoje={statusHoje}
+          historico={statusHistorico}
+          error={statusError}
+          onClose={() => setShowStatus(false)}
+        />
+      )}
 
       <header className="app-header">
         <div className="header-brand">
@@ -188,6 +229,15 @@ export default function App() {
             pinLength={pin.length}
             minLength={4}
           />
+          {pin.length >= 4 && (
+            <button className="status-peek-btn" onClick={handleShowStatus}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              Ver jornada e histórico
+            </button>
+          )}
         </div>
 
       </main>

@@ -884,6 +884,166 @@ body {
   .clock-time { font-size: 2rem; }
 }
 
+/* ─── Status peek button ─────────────────────────────────── */
+.status-peek-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.status-peek-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-light);
+}
+
+/* ─── Pin Status Drawer ──────────────────────────────────── */
+.psd-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 400;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.psd-sheet {
+  background: var(--bg);
+  width: 100%;
+  max-width: 520px;
+  max-height: 88dvh;
+  border-radius: 20px 20px 0 0;
+  overflow-y: auto;
+  padding: 8px 20px 32px;
+  animation: slideUp 0.28s cubic-bezier(.32,1,.32,1);
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+@media (min-width: 600px) {
+  .psd-overlay { align-items: center; }
+  .psd-sheet { border-radius: 16px; max-height: 80dvh; }
+}
+
+.psd-handle {
+  width: 40px; height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 6px auto 16px;
+}
+
+.psd-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.psd-label { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+.psd-pin { font-size: 1.6rem; font-weight: 800; color: var(--text); letter-spacing: .12em; }
+.psd-close {
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+.psd-close:hover { color: var(--text); }
+
+.psd-loading { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 40px; color: var(--text-muted); }
+
+.psd-section { margin-bottom: 24px; }
+.psd-section-title {
+  font-size: 0.78rem; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .05em;
+  margin-bottom: 12px;
+}
+
+/* Steps */
+.psd-steps { display: flex; flex-direction: column; gap: 10px; }
+
+.psd-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+.psd-step--done   { border-color: transparent; }
+.psd-step--current { border-color: var(--primary); background: var(--primary-light); }
+.psd-step--pending { opacity: 0.5; }
+
+.psd-step-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--border);
+  flex-shrink: 0;
+}
+.psd-step--current .psd-step-dot { background: var(--primary); }
+
+.psd-step-body { display: flex; justify-content: space-between; align-items: center; flex: 1; gap: 8px; }
+.psd-step-label { font-size: 0.88rem; color: var(--text); font-weight: 500; }
+.psd-step-time  { font-size: 0.88rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.psd-step--current .psd-step-label,
+.psd-step--current .psd-step-time { color: var(--primary); }
+
+.psd-complete { text-align: center; color: var(--success); font-weight: 600; font-size: 0.9rem; margin-top: 10px; }
+.psd-empty    { color: var(--text-muted); font-size: 0.88rem; }
+
+/* History */
+.psd-history { display: flex; flex-direction: column; gap: 10px; }
+
+.psd-record {
+  padding: 12px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.psd-record--complete { border-left: 3px solid var(--success); }
+
+.psd-record-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.psd-record-date { font-size: 0.82rem; font-weight: 600; color: var(--text); text-transform: capitalize; }
+.psd-record-work { font-size: 0.82rem; font-weight: 700; color: var(--primary); }
+
+.psd-record-times {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.psd-rtime {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 6px 8px;
+  background: var(--bg);
+  border-radius: 6px;
+  opacity: 0.5;
+}
+.psd-rtime--filled { opacity: 1; }
+.psd-rtime-label { font-size: 0.65rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
+.psd-rtime-val   { font-size: 0.85rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+
 /* ─── Scrollbar ──────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

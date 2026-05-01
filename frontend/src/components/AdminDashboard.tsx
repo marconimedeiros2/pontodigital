@@ -205,11 +205,11 @@ function TimeCell({ value, onSave }: { value: string | null; onSave: (v: string 
 
   return (
     <span
-      className={`rel-time-display${saving ? ' rel-time-display--saving' : ''}`}
+      className={`rel-time-display${!value ? ' rel-time-display--empty' : ''}${saving ? ' rel-time-display--saving' : ''}`}
       onClick={() => !saving && setEditing(true)}
       title="Clique para editar"
     >
-      {displayTime(value)}
+      {value ? displayTime(value) : '+'}
     </span>
   );
 }

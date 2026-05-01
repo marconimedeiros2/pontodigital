@@ -401,6 +401,40 @@ code {
 [data-theme='dark'] .action-btn--delete { background: #2d1515; border-color: #7f1d1d; }
 [data-theme='dark'] .action-btn--toggle { background: #1e3a5f; color: #93c5fd; border-color: #1e3a5f; }
 
+/* Inline time display/edit in relatório table */
+.rel-time-display {
+  display: inline-block;
+  font-size: 0.88rem;
+  color: var(--text);
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  white-space: nowrap;
+}
+
+.rel-time-display:hover {
+  background: var(--bg);
+  border-color: var(--border);
+}
+
+.rel-time-display--saving {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.rel-time-input--open {
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.82rem;
+  padding: 3px 6px;
+  box-shadow: 0 0 0 2px var(--primary-light);
+  outline: none;
+}
+
 .admin-loading { display: flex; justify-content: center; padding: 40px; }
 
 .admin-empty {

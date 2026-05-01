@@ -94,6 +94,15 @@ export const adminApi = {
   deleteUsuario: (pin: string) =>
     request<{ ok: boolean }>(`${BASE}/usuarios/${pin}`, { method: 'DELETE' }),
 
+  updateRegistro: (
+    id: number,
+    fields: Partial<Pick<RegistroAdmin, 'hora_inicial' | 'inicio_intervalo' | 'fim_intervalo' | 'hora_final'>>
+  ) =>
+    request<{ ok: boolean }>(`${BASE}/registros/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(fields),
+    }),
+
   hideRegistro: (id: number) =>
     request<{ ok: boolean }>(`${BASE}/registros/${id}`, { method: 'DELETE' }),
 

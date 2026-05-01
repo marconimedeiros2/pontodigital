@@ -240,6 +240,32 @@ router.put('/usuarios/:pin', authMiddleware, async (req: Request, res: Response)
   }
 });
 
+// PUT /api/admin/registros/:id  (editar campos de data/hora)
+router.put('/registros/:id', authMiddleware, async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: 'ID inválido.' });
+  }
+
+  const allowed = ['hora_inicial', 'inicio_intervalo', 'fim_intervalo', 'hora_final'] as const;
+  const fields: Partial<Record<typeof allowed[number], string | null>> = {};
+  for (const f of allowed) {
+    if (f in req.body) fields[f] = req.body[f] ?? null;
+  }
+
+  if (Object.keys(fields).length === 0) {
+    return res.status(400).json({ error: 'Nenhum campo válido informado.' });
+  }
+
+  try {
+    await db.updateById(id, fields);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[PUT /registros/:id]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
 // DELETE /api/admin/registros/:id  (soft delete — marca como oculto)
 router.delete('/registros/:id', authMiddleware, async (req: Request, res: Response) => {
   const id = Number(req.params.id);

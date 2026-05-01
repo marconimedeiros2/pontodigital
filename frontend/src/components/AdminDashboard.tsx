@@ -160,6 +160,52 @@ function StatusBadge({ reg }: { reg: RegistroAdmin }) {
 
 const today = new Date().toISOString().split('T')[0];
 
+type TimeField = 'hora_inicial' | 'inicio_intervalo' | 'fim_intervalo' | 'hora_final';
+
+function toInputVal(val: string | null) { return val ? val.slice(0, 16).replace(' ', 'T') : ''; }
+function fromInputVal(val: string): string | null { return val ? val.replace('T', ' ') + ':00' : null; }
+function displayTime(val: string | null) { return val ? val.slice(11, 16) : '—'; }
+
+function TimeCell({ value, onSave }: { value: string | null; onSave: (v: string | null) => Promise<void> }) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const commit = async (raw: string) => {
+    const next = fromInputVal(raw);
+    if (next === value) { setEditing(false); return; }
+    setSaving(true);
+    try { await onSave(next); }
+    catch (e) { alert('Erro ao salvar: ' + (e instanceof Error ? e.message : 'Erro')); }
+    finally { setSaving(false); setEditing(false); }
+  };
+
+  if (editing) {
+    return (
+      <input
+        type="datetime-local"
+        className="rel-time-input rel-time-input--open"
+        autoFocus
+        defaultValue={toInputVal(value)}
+        onBlur={(e) => commit(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+          if (e.key === 'Escape') setEditing(false);
+        }}
+      />
+    );
+  }
+
+  return (
+    <span
+      className={`rel-time-display${saving ? ' rel-time-display--saving' : ''}`}
+      onClick={() => !saving && setEditing(true)}
+      title="Clique para editar"
+    >
+      {displayTime(value)}
+    </span>
+  );
+}
+
 export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [tab, setTab] = useState<AdminTab>('dashboard');
 
@@ -264,8 +310,18 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const handleHideSelected = async () => {
     if (!confirm(`Ocultar ${relSelected.size} registro(s) selecionado(s)?`)) return;
     await Promise.all([...relSelected].map((id) => adminApi.hideRegistro(id).catch(() => {})));
-    setRelData((prev) => prev.filter((r) => !relSelected.has(r.id)));
+    setRelDataAll((prev) => prev.map((r) => relSelected.has(r.id) ? { ...r, oculto: true } : r));
     setRelSelected(new Set());
+  };
+
+  const handleFieldEdit = async (id: number, field: TimeField, apiVal: string | null) => {
+    await adminApi.updateRegistro(id, { [field]: apiVal });
+    setRelDataAll((prev) => prev.map((r) => {
+      if (r.id !== id) return r;
+      const u = { ...r, [field]: apiVal };
+      u.completo = !!(u.hora_inicial && u.inicio_intervalo && u.fim_intervalo && u.hora_final);
+      return u;
+    }));
   };
 
   const exportCSV = (registros: RegistroAdmin[], prefix = 'relatorio') => {
@@ -614,10 +670,14 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                           </td>
                           <td>{formatDate(r.data)}</td>
                           <td className="td-nome">{r.nome}</td>
-                          <td>{r.hora_inicial || '—'}</td>
-                          <td>{r.inicio_intervalo || '—'}</td>
-                          <td>{r.fim_intervalo || '—'}</td>
-                          <td>{r.hora_final || '—'}</td>
+                          {(['hora_inicial', 'inicio_intervalo', 'fim_intervalo', 'hora_final'] as TimeField[]).map((field) => (
+                            <td key={field}>
+                              <TimeCell
+                                value={r[field]}
+                                onSave={(v) => handleFieldEdit(r.id, field, v)}
+                              />
+                            </td>
+                          ))}
                           <td>
                             <span className={`badge badge--${r.completo ? 'presente' : 'ausente'}`}>
                               {r.completo ? 'Completo' : 'Incompleto'}

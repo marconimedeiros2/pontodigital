@@ -29,6 +29,7 @@ export interface RegistroAdmin {
   fim_intervalo: string | null;
   hora_final: string | null;
   completo: boolean;
+  oculto?: boolean;
 }
 
 export interface DashboardStats {
@@ -67,11 +68,12 @@ export const adminApi = {
       `${BASE}/dashboard${data ? `?data=${data}` : ''}`
     ),
 
-  getRelatorio: (inicio?: string, fim?: string) => {
+  getRelatorio: (inicio?: string, fim?: string, incluirOcultos = false) => {
     const params = new URLSearchParams();
     if (inicio) params.set('inicio', inicio);
     if (fim) params.set('fim', fim);
-    return request<{ registros: RegistroAdmin[] }>(`${BASE}/relatorio?${params}`);
+    if (incluirOcultos) params.set('incluirOcultos', 'true');
+    return request<{ registros: RegistroAdmin[]; ocultosCount: number }>(`${BASE}/relatorio?${params}`);
   },
 
   listUsuarios: () =>

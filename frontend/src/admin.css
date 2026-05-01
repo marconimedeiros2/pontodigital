@@ -330,6 +330,30 @@ code {
 
 .rel-filters { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
 
+/* Mostrar/esconder ocultos */
+.btn-toggle-ocultos {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.btn-toggle-ocultos:hover { color: var(--primary); }
+
+.rel-row--oculto td {
+  opacity: 0.45;
+  font-style: italic;
+  text-decoration: line-through;
+  text-decoration-color: var(--text-muted);
+}
+
 /* Ocultar selecionados */
 .btn-delete-selected {
   display: flex;

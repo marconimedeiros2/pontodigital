@@ -122,6 +122,18 @@ export const db = {
     return (data ?? []) as Registro[];
   },
 
+  async findAllHidden(limit = 200): Promise<Registro[]> {
+    const { data, error } = await supabase
+      .from('registros')
+      .select('*')
+      .eq('oculto', true)
+      .order('data', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) raise(error, 'findAllHidden');
+    return (data ?? []) as Registro[];
+  },
+
   // ── Usuários ───────────────────────────────────────────────────────────────
 
   async listUsuarios(): Promise<Usuario[]> {

@@ -185,6 +185,8 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [relData, setRelData] = useState<RegistroAdmin[]>([]);
   const [relLoading, setRelLoading] = useState(false);
   const [relSelected, setRelSelected] = useState<Set<number>>(new Set());
+  const [ocultosCount, setOcultosCount] = useState(0);
+  const [mostrarOcultos, setMostrarOcultos] = useState(false);
 
   // Config state
   const [senhaAtual, setSenhaAtual] = useState('');
@@ -237,13 +239,25 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     try { await adminApi.deleteUsuario(pin); await loadUsuarios(); } catch { /* ignore */ }
   };
 
-  const handleRelatorio = async () => {
+  const fetchRelatorio = async (ocultos: boolean) => {
     setRelLoading(true);
     setRelSelected(new Set());
     try {
-      const data = await adminApi.getRelatorio(relInicio || undefined, relFim || undefined);
+      const data = await adminApi.getRelatorio(relInicio || undefined, relFim || undefined, ocultos);
       setRelData(data.registros);
+      setOcultosCount(data.ocultosCount);
     } catch { /* ignore */ } finally { setRelLoading(false); }
+  };
+
+  const handleRelatorio = () => {
+    setMostrarOcultos(false);
+    fetchRelatorio(false);
+  };
+
+  const handleToggleOcultos = () => {
+    const next = !mostrarOcultos;
+    setMostrarOcultos(next);
+    fetchRelatorio(next);
   };
 
   const toggleRelSelect = (id: number) =>
@@ -550,7 +564,26 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
             {relData.length > 0 && (
               <>
                 <div className="admin-table-actions">
-                  <span className="history-count">{relData.length} registros</span>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <span className="history-count">{relData.length} registros</span>
+                    {ocultosCount > 0 && (
+                      <button className="btn-toggle-ocultos" onClick={handleToggleOcultos}>
+                        {mostrarOcultos ? (
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/>
+                            <path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/>
+                            <line x1="1" y1="1" x2="23" y2="23"/>
+                          </svg>
+                        ) : (
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                          </svg>
+                        )}
+                        {mostrarOcultos ? 'Esconder ocultos' : `${ocultosCount} oculto${ocultosCount > 1 ? 's' : ''}`}
+                      </button>
+                    )}
+                  </div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     {relSelected.size > 0 && (
                       <button className="btn-delete-selected" onClick={handleHideSelected}>
@@ -576,7 +609,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                     </thead>
                     <tbody>
                       {relData.map((r) => (
-                        <tr key={r.id} className={relSelected.has(r.id) ? 'rel-row--selected' : ''}>
+                        <tr key={r.id} className={[relSelected.has(r.id) ? 'rel-row--selected' : '', r.oculto ? 'rel-row--oculto' : ''].filter(Boolean).join(' ')}>
                           <td>
                             <input type="checkbox" className="rel-checkbox"
                               checked={relSelected.has(r.id)} onChange={() => toggleRelSelect(r.id)} />

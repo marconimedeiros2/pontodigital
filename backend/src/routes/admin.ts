@@ -125,34 +125,41 @@ router.get('/dashboard', authMiddleware, async (req: Request, res: Response) => 
   }
 });
 
-// GET /api/admin/relatorio?inicio=YYYY-MM-DD&fim=YYYY-MM-DD
+// GET /api/admin/relatorio?inicio=YYYY-MM-DD&fim=YYYY-MM-DD&incluirOcultos=true
 router.get('/relatorio', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const [registros, usuarios] = await Promise.all([
+    const { inicio, fim, incluirOcultos } = req.query as {
+      inicio?: string; fim?: string; incluirOcultos?: string;
+    };
+    const mostrarOcultos = incluirOcultos === 'true';
+
+    const [todosVisiveis, todosOcultos, usuarios] = await Promise.all([
       db.findAll(500),
+      db.findAllHidden(500),
       db.listUsuarios(),
     ]);
 
     const usuariosMap = Object.fromEntries(usuarios.map((u) => [u.id, u]));
-    const { inicio, fim } = req.query as { inicio?: string; fim?: string };
 
-    const filtered = registros.filter((r) => {
-      if (inicio && r.data < inicio) return false;
-      if (fim && r.data > fim) return false;
+    const inRange = (data: string) => {
+      if (inicio && data < inicio) return false;
+      if (fim && data > fim) return false;
       return true;
+    };
+
+    const enrich = (r: (typeof todosVisiveis)[0], oculto = false) => ({
+      ...r,
+      oculto,
+      nome: usuariosMap[r.usuario_id]?.nome ?? `PIN ${r.pin}`,
+      completo: r.hora_inicial !== null && r.inicio_intervalo !== null &&
+                r.fim_intervalo !== null && r.hora_final !== null,
     });
 
-    const enriched = filtered.map((r) => ({
-      ...r,
-      nome: usuariosMap[r.usuario_id]?.nome ?? `PIN ${r.pin}`,
-      completo:
-        r.hora_inicial !== null &&
-        r.inicio_intervalo !== null &&
-        r.fim_intervalo !== null &&
-        r.hora_final !== null,
-    }));
+    const visiveis  = todosVisiveis.filter((r) => inRange(r.data)).map((r) => enrich(r, false));
+    const ocultos   = todosOcultos.filter((r) => inRange(r.data)).map((r) => enrich(r, true));
+    const registros = mostrarOcultos ? [...visiveis, ...ocultos] : visiveis;
 
-    return res.json({ registros: enriched });
+    return res.json({ registros, ocultosCount: ocultos.length });
   } catch (err) {
     console.error('[GET /relatorio]', err);
     return res.status(500).json({ error: 'Erro interno.' });

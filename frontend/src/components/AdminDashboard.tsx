@@ -275,7 +275,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
        r.fim_intervalo || '', r.hora_final || '', calcWorkTime(r),
        r.completo ? 'Completo' : 'Incompleto'].join(',')
     ).join('\n');
-    const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['﻿' + header + rows], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = `${prefix}_${today}.csv`; a.click();
@@ -415,7 +415,11 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                             <td>{r.inicio_intervalo || '—'}</td>
                             <td>{r.fim_intervalo || '—'}</td>
                             <td>{r.hora_final || '—'}</td>
-                            <td><strong>{calcWorkTime(r)}</strong></td>
+                            <td>
+                              <span className={`badge badge--${r.completo ? 'presente' : 'ausente'}`}>
+                                {r.completo ? 'Completo' : 'Incompleto'}
+                              </span>
+                            </td>
                             <td><StatusBadge reg={r} /></td>
                           </tr>
                         ))}
@@ -614,7 +618,11 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                           <td>{r.inicio_intervalo || '—'}</td>
                           <td>{r.fim_intervalo || '—'}</td>
                           <td>{r.hora_final || '—'}</td>
-                          <td><strong>{calcWorkTime(r)}</strong></td>
+                          <td>
+                            <span className={`badge badge--${r.completo ? 'presente' : 'ausente'}`}>
+                              {r.completo ? 'Completo' : 'Incompleto'}
+                            </span>
+                          </td>
                           <td><StatusBadge reg={r} /></td>
                         </tr>
                       ))}

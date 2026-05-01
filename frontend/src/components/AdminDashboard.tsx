@@ -137,11 +137,18 @@ function EditModal({ usuario, onClose, onSaved }: EditModalProps) {
 
 function calcWorkTime(reg: RegistroAdmin): string {
   if (!reg.hora_inicial || !reg.hora_final) return '—';
-  const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
-  const total = toMin(reg.hora_final) - toMin(reg.hora_inicial);
-  const interval = reg.inicio_intervalo && reg.fim_intervalo
-    ? toMin(reg.fim_intervalo) - toMin(reg.inicio_intervalo) : 0;
-  const worked = total - interval;
+  const toMin = (t: string) => {
+    const time = t.includes(' ') ? t.split(' ')[1] : t;
+    const [h, m] = time.split(':').map(Number);
+    return h * 60 + m;
+  };
+  const morning = reg.inicio_intervalo
+    ? toMin(reg.inicio_intervalo) - toMin(reg.hora_inicial)
+    : toMin(reg.hora_final) - toMin(reg.hora_inicial);
+  const afternoon = reg.inicio_intervalo && reg.fim_intervalo
+    ? toMin(reg.hora_final) - toMin(reg.fim_intervalo)
+    : 0;
+  const worked = reg.inicio_intervalo ? morning + afternoon : morning;
   if (worked < 0) return '—';
   return `${Math.floor(worked / 60)}h${String(worked % 60).padStart(2, '0')}`;
 }
@@ -472,11 +479,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                             <td>{r.inicio_intervalo || '—'}</td>
                             <td>{r.fim_intervalo || '—'}</td>
                             <td>{r.hora_final || '—'}</td>
-                            <td>
-                              <span className={`badge badge--${r.completo ? 'presente' : 'ausente'}`}>
-                                {r.completo ? 'Completo' : 'Incompleto'}
-                              </span>
-                            </td>
+                            <td><strong>{calcWorkTime(r)}</strong></td>
                             <td><StatusBadge reg={r} /></td>
                           </tr>
                         ))}
@@ -679,11 +682,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                               />
                             </td>
                           ))}
-                          <td>
-                            <span className={`badge badge--${r.completo ? 'presente' : 'ausente'}`}>
-                              {r.completo ? 'Completo' : 'Incompleto'}
-                            </span>
-                          </td>
+                          <td><strong>{calcWorkTime(r)}</strong></td>
                           <td><StatusBadge reg={r} /></td>
                         </tr>
                       ))}

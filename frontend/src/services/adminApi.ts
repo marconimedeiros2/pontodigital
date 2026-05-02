@@ -130,12 +130,12 @@ export const adminApi = {
     request<{ ok: boolean }>(`${BASE}/registros/${id}`, { method: 'DELETE' }),
 
   getEscala: () =>
-    request<{ escala_padrao: number }>(`${BASE}/configuracoes/escala`),
+    request<{ escala_padrao: number; intervalo_padrao: number }>(`${BASE}/configuracoes/escala`),
 
-  setEscala: (escala_padrao: number) =>
+  setEscala: (escala_padrao: number, intervalo_padrao: number) =>
     request<{ ok: boolean }>(`${BASE}/configuracoes/escala`, {
       method: 'PUT',
-      body: JSON.stringify({ escala_padrao }),
+      body: JSON.stringify({ escala_padrao, intervalo_padrao }),
     }),
 
   saveToken: (token: string) => sessionStorage.setItem('admin_token', token),

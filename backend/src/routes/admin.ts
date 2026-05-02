@@ -358,8 +358,8 @@ router.delete('/usuarios/:pin', authMiddleware, async (req: Request, res: Respon
 // GET /api/admin/configuracoes/escala
 router.get('/configuracoes/escala', authMiddleware, async (_req: Request, res: Response) => {
   try {
-    const escala_padrao = await db.getEscalaPadrao();
-    return res.json({ escala_padrao });
+    const config = await db.getEscalaConfig();
+    return res.json(config);
   } catch (err) {
     console.error('[GET /configuracoes/escala]', err);
     return res.status(500).json({ error: 'Erro interno.' });
@@ -368,13 +368,17 @@ router.get('/configuracoes/escala', authMiddleware, async (_req: Request, res: R
 
 // PUT /api/admin/configuracoes/escala
 router.put('/configuracoes/escala', authMiddleware, async (req: Request, res: Response) => {
-  const { escala_padrao } = req.body as { escala_padrao?: number };
-  const minutos = Number(escala_padrao);
-  if (isNaN(minutos) || minutos < 60 || minutos > 1440) {
+  const { escala_padrao, intervalo_padrao } = req.body as { escala_padrao?: number; intervalo_padrao?: number };
+  const escala = Number(escala_padrao);
+  const intervalo = Number(intervalo_padrao);
+  if (isNaN(escala) || escala < 60 || escala > 1440) {
     return res.status(400).json({ error: 'Escala inválida (1h–24h).' });
   }
+  if (isNaN(intervalo) || intervalo < 0 || intervalo > 480) {
+    return res.status(400).json({ error: 'Intervalo inválido (0–8h).' });
+  }
   try {
-    await db.setEscalaPadrao(minutos);
+    await db.setEscalaConfig(escala, intervalo);
     return res.json({ ok: true });
   } catch (err) {
     console.error('[PUT /configuracoes/escala]', err);

@@ -493,6 +493,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [configMsg, setConfigMsg] = useState('');
   const [configError, setConfigError] = useState('');
   const [escalaPadrao, setEscalaPadrao] = useState('7:20');
+  const [intervaloPadrao, setIntervaloPadrao] = useState('1:00');
   const [escalaMsg, setEscalaMsg] = useState('');
   const [escalaError, setEscalaError] = useState('');
 
@@ -516,11 +517,12 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   useEffect(() => { if (tab === 'usuarios') loadUsuarios(); }, [tab, loadUsuarios]);
 
   useEffect(() => {
-    adminApi.getEscala().then(({ escala_padrao }) => {
+    adminApi.getEscala().then(({ escala_padrao, intervalo_padrao }) => {
       const hhmm = minutesToHHMM(escala_padrao);
       setEscalaPadrao(hhmm);
       setNovoHoras(hhmm);
       setBulkHoras(hhmm);
+      setIntervaloPadrao(minutesToHHMM(intervalo_padrao));
     }).catch(() => {});
   }, []);
 
@@ -564,14 +566,16 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
 
   const handleSaveEscala = async () => {
     setEscalaError(''); setEscalaMsg('');
-    const minutos = hhmmToMinutes(escalaPadrao);
-    if (isNaN(minutos) || minutos < 60 || minutos > 1440) { setEscalaError('Jornada inválida. Use o formato HH:MM (ex: 7:20).'); return; }
+    const minEscala = hhmmToMinutes(escalaPadrao);
+    const minIntervalo = hhmmToMinutes(intervaloPadrao);
+    if (isNaN(minEscala) || minEscala < 60 || minEscala > 1440) { setEscalaError('Jornada inválida. Use o formato H:MM (ex: 7:20).'); return; }
+    if (isNaN(minIntervalo) || minIntervalo < 0 || minIntervalo > 480) { setEscalaError('Intervalo inválido. Use o formato H:MM (ex: 1:00).'); return; }
     try {
-      await adminApi.setEscala(minutos);
+      await adminApi.setEscala(minEscala, minIntervalo);
       setNovoHoras(escalaPadrao);
       setBulkHoras(escalaPadrao);
-      setEscalaMsg('Escala padrão salva com sucesso!');
-    } catch { setEscalaError('Erro ao salvar escala.'); }
+      setEscalaMsg('Configurações salvas com sucesso!');
+    } catch { setEscalaError('Erro ao salvar configurações.'); }
   };
 
   const handleToggleAtivo = async (u: Usuario) => {
@@ -1131,16 +1135,30 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 16 }}>
                 Jornada padrão aplicada ao cadastrar novos funcionários. Use o formato <strong>H:MM</strong> (ex: 7:20).
               </p>
-              <div className="input-group">
-                <label className="input-label">Jornada padrão (H:MM)</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    type="text" pattern="\d+:[0-5]\d" placeholder="7:20"
-                    className="text-input" style={{ width: 120 }}
-                    value={escalaPadrao}
-                    onChange={(e) => { setEscalaPadrao(e.target.value); setEscalaMsg(''); setEscalaError(''); }}
-                  />
-                  <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>h:mm / dia</span>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div className="input-group">
+                  <label className="input-label">Jornada padrão (H:MM)</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input
+                      type="text" pattern="\d+:[0-5]\d" placeholder="7:20"
+                      className="text-input" style={{ width: 100 }}
+                      value={escalaPadrao}
+                      onChange={(e) => { setEscalaPadrao(e.target.value); setEscalaMsg(''); setEscalaError(''); }}
+                    />
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>h:mm</span>
+                  </div>
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Intervalo padrão (H:MM)</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input
+                      type="text" pattern="\d+:[0-5]\d" placeholder="1:00"
+                      className="text-input" style={{ width: 100 }}
+                      value={intervaloPadrao}
+                      onChange={(e) => { setIntervaloPadrao(e.target.value); setEscalaMsg(''); setEscalaError(''); }}
+                    />
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>h:mm</span>
+                  </div>
                 </div>
               </div>
               {escalaError && <p className="error-msg" style={{ marginTop: 8 }}>{escalaError}</p>}

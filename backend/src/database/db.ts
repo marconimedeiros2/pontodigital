@@ -235,21 +235,22 @@ export const db = {
     if (error) raise(error, 'changePassword');
   },
 
-  async getEscalaPadrao(): Promise<number> {
+  async getEscalaConfig(): Promise<{ escala_padrao: number; intervalo_padrao: number }> {
     const { data, error } = await supabase
       .from('admin_config')
-      .select('escala_padrao')
+      .select('escala_padrao, intervalo_padrao')
       .eq('id', 1)
       .single();
-    if (error) return 440;
-    return (data as { escala_padrao: number }).escala_padrao ?? 440;
+    if (error) return { escala_padrao: 440, intervalo_padrao: 60 };
+    const row = data as { escala_padrao: number; intervalo_padrao: number };
+    return { escala_padrao: row.escala_padrao ?? 440, intervalo_padrao: row.intervalo_padrao ?? 60 };
   },
 
-  async setEscalaPadrao(minutos: number): Promise<void> {
+  async setEscalaConfig(escala_padrao: number, intervalo_padrao: number): Promise<void> {
     const { error } = await supabase
       .from('admin_config')
-      .update({ escala_padrao: minutos })
+      .update({ escala_padrao, intervalo_padrao })
       .eq('id', 1);
-    if (error) raise(error, 'setEscalaPadrao');
+    if (error) raise(error, 'setEscalaConfig');
   },
 };

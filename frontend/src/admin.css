@@ -442,29 +442,39 @@ code {
 [data-theme='dark'] .btn-delete-selected { background: #3f1212; border-color: #7f1d1d; color: #fca5a5; }
 [data-theme='dark'] .btn-delete-selected:hover { background: #7f1d1d; }
 
-/* Action buttons */
-.action-btns { display: flex; gap: 6px; }
+/* Icon action buttons */
+.action-btns { display: flex; gap: 4px; align-items: center; }
 
-.action-btn {
-  font-size: 0.78rem;
-  font-weight: 600;
-  padding: 5px 12px;
-  border-radius: 6px;
-  cursor: pointer;
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   border: 1px solid transparent;
-  transition: background 0.15s;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, transform 0.1s;
+  background: transparent;
 }
 
-.action-btn--edit { background: #f8fafc; color: var(--text); border-color: var(--border); }
-.action-btn--edit:hover { background: var(--keypad-btn-hover); }
-.action-btn--toggle { background: var(--primary-light); color: var(--primary); border-color: var(--primary-light); }
-.action-btn--toggle:hover { opacity: 0.8; }
-.action-btn--delete { background: #fef2f2; color: var(--danger); border-color: #fecaca; }
-.action-btn--delete:hover { background: #fee2e2; }
+.icon-btn:hover { transform: scale(1.1); }
 
-[data-theme='dark'] .action-btn--edit { background: #1e293b; border-color: var(--border); color: var(--text); }
-[data-theme='dark'] .action-btn--delete { background: #2d1515; border-color: #7f1d1d; }
-[data-theme='dark'] .action-btn--toggle { background: #1e3a5f; color: #93c5fd; border-color: #1e3a5f; }
+.icon-btn--edit { color: #64748b; }
+.icon-btn--edit:hover { background: #f1f5f9; color: #1e293b; border-color: #e2e8f0; }
+
+.icon-btn--toggle { color: #2563eb; }
+.icon-btn--toggle:hover { background: #eff6ff; border-color: #bfdbfe; }
+
+.icon-btn--delete { color: #ef4444; }
+.icon-btn--delete:hover { background: #fef2f2; border-color: #fecaca; }
+
+[data-theme='dark'] .icon-btn--edit { color: #94a3b8; }
+[data-theme='dark'] .icon-btn--edit:hover { background: #1e293b; color: #e2e8f0; border-color: var(--border); }
+[data-theme='dark'] .icon-btn--toggle { color: #60a5fa; }
+[data-theme='dark'] .icon-btn--toggle:hover { background: #1e3a5f; border-color: #1d4ed8; }
+[data-theme='dark'] .icon-btn--delete { color: #f87171; }
+[data-theme='dark'] .icon-btn--delete:hover { background: #2d1515; border-color: #7f1d1d; }
 
 /* Inline time display/edit in relatório table */
 .rel-time-display {

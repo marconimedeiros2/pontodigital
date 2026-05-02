@@ -44,6 +44,7 @@ export interface Usuario {
   pin: string;
   nome: string;
   ativo: boolean;
+  horas_diarias: number;
   created_at: string;
 }
 
@@ -79,16 +80,22 @@ export const adminApi = {
   listUsuarios: () =>
     request<{ usuarios: Usuario[] }>(`${BASE}/usuarios`),
 
-  createUsuario: (pin: string, nome: string) =>
+  createUsuario: (pin: string, nome: string, horas_diarias: number) =>
     request<{ usuario: Usuario }>(`${BASE}/usuarios`, {
       method: 'POST',
-      body: JSON.stringify({ pin, nome }),
+      body: JSON.stringify({ pin, nome, horas_diarias }),
     }),
 
-  updateUsuario: (pin: string, data: Partial<{ nome: string; ativo: boolean; novoPin: string }>) =>
+  updateUsuario: (pin: string, data: Partial<{ nome: string; ativo: boolean; novoPin: string; horas_diarias: number }>) =>
     request<{ usuario: Usuario }>(`${BASE}/usuarios/${pin}`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    }),
+
+  bulkUpdateJornada: (pins: string[], horas_diarias: number) =>
+    request<{ ok: boolean; updated: number }>(`${BASE}/usuarios/jornada`, {
+      method: 'PATCH',
+      body: JSON.stringify({ pins, horas_diarias }),
     }),
 
   deleteUsuario: (pin: string) =>

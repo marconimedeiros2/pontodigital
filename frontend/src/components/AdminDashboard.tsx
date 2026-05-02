@@ -19,6 +19,7 @@ function EditModal({ usuario, onClose, onSaved }: EditModalProps) {
   const [nome, setNome] = useState(usuario.nome);
   const [novoPin, setNovoPin] = useState(usuario.pin);
   const [ativo, setAtivo] = useState(usuario.ativo);
+  const [horasDiarias, setHorasDiarias] = useState(String(usuario.horas_diarias ?? 8));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -28,12 +29,15 @@ function EditModal({ usuario, onClose, onSaved }: EditModalProps) {
     setError('');
     if (!nome.trim()) { setError('Nome é obrigatório.'); return; }
     if (!/^\d{4,6}$/.test(novoPin)) { setError('PIN deve ter entre 4 e 6 dígitos numéricos.'); return; }
+    const horas = parseFloat(horasDiarias);
+    if (isNaN(horas) || horas < 1 || horas > 24) { setError('Horas diárias inválidas (1–24).'); return; }
 
     setLoading(true);
     try {
       await adminApi.updateUsuario(usuario.pin, {
         nome,
         ativo,
+        horas_diarias: horas,
         ...(pinChanged ? { novoPin } : {}),
       });
       onSaved();
@@ -79,6 +83,19 @@ function EditModal({ usuario, onClose, onSaved }: EditModalProps) {
               ⚠️ Todos os registros de ponto serão migrados para o novo PIN.
             </p>
           )}
+        </div>
+
+        <div className="input-group" style={{ marginBottom: 14 }}>
+          <label className="input-label">Horas Diárias</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="number" min={1} max={24} step={0.5}
+              className="text-input" style={{ width: 100 }}
+              value={horasDiarias}
+              onChange={(e) => setHorasDiarias(e.target.value)}
+            />
+            <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>h / dia</span>
+          </div>
         </div>
 
         <div className="input-group" style={{ marginBottom: 20 }}>
@@ -436,9 +453,13 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [novoPin, setNovoPin] = useState('');
   const [novoNome, setNovoNome] = useState('');
+  const [novoHoras, setNovoHoras] = useState('8');
   const [usuariosLoading, setUsuariosLoading] = useState(false);
   const [usuariosError, setUsuariosError] = useState('');
   const [editingUsuario, setEditingUsuario] = useState<Usuario | null>(null);
+  const [selectedUsuarios, setSelectedUsuarios] = useState<Set<string>>(new Set());
+  const [bulkHoras, setBulkHoras] = useState('8');
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   // Relatório state
   const [relInicio, setRelInicio] = useState(today);
@@ -487,11 +508,33 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const handleAddUsuario = async () => {
     setUsuariosError('');
     if (!novoPin || !novoNome.trim()) { setUsuariosError('Preencha PIN e Nome.'); return; }
+    const horas = parseFloat(novoHoras);
+    if (isNaN(horas) || horas < 1 || horas > 24) { setUsuariosError('Horas diárias inválidas (1–24).'); return; }
     try {
-      await adminApi.createUsuario(novoPin, novoNome);
-      setNovoPin(''); setNovoNome('');
+      await adminApi.createUsuario(novoPin, novoNome, horas);
+      setNovoPin(''); setNovoNome(''); setNovoHoras('8');
       await loadUsuarios();
     } catch (e) { setUsuariosError(e instanceof Error ? e.message : 'Erro'); }
+  };
+
+  const toggleSelectUsuario = (pin: string) =>
+    setSelectedUsuarios((prev) => { const n = new Set(prev); n.has(pin) ? n.delete(pin) : n.add(pin); return n; });
+
+  const allUsuariosSelected = usuarios.length > 0 && selectedUsuarios.size === usuarios.length;
+  const toggleAllUsuarios = () =>
+    setSelectedUsuarios(allUsuariosSelected ? new Set() : new Set(usuarios.map((u) => u.pin)));
+
+  const handleBulkJornada = async () => {
+    const horas = parseFloat(bulkHoras);
+    if (isNaN(horas) || horas < 1 || horas > 24) return;
+    if (!confirm(`Alterar jornada de ${selectedUsuarios.size} funcionário(s) para ${horas}h?`)) return;
+    setBulkLoading(true);
+    try {
+      await adminApi.bulkUpdateJornada([...selectedUsuarios], horas);
+      setUsuarios((prev) => prev.map((u) => selectedUsuarios.has(u.pin) ? { ...u, horas_diarias: horas } : u));
+      setSelectedUsuarios(new Set());
+    } catch (e) { setUsuariosError(e instanceof Error ? e.message : 'Erro ao atualizar'); }
+    finally { setBulkLoading(false); }
   };
 
   const handleToggleAtivo = async (u: Usuario) => {
@@ -765,7 +808,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               <h3 className="admin-card-title">Adicionar Funcionário</h3>
               <div className="add-user-form">
                 <div className="input-group">
-                  <label className="input-label">PIN (4-6 dígitos numéricos)</label>
+                  <label className="input-label">PIN (4-6 dígitos)</label>
                   <input type="tel" inputMode="numeric" pattern="[0-9]*" maxLength={6}
                     value={novoPin} onChange={(e) => setNovoPin(e.target.value.replace(/\D/g, ''))}
                     placeholder="Ex: 1234" className="text-input" />
@@ -775,6 +818,12 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   <input type="text" value={novoNome}
                     onChange={(e) => setNovoNome(e.target.value)}
                     placeholder="Nome completo" className="text-input" />
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Jornada (h/dia)</label>
+                  <input type="number" min={1} max={24} step={0.5}
+                    value={novoHoras} onChange={(e) => setNovoHoras(e.target.value)}
+                    className="text-input" style={{ width: '100%' }} />
                 </div>
                 <button className="confirm-btn" style={{ marginTop: 8 }} onClick={handleAddUsuario}>
                   Adicionar
@@ -791,15 +840,49 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
 
             {!usuariosLoading && usuarios.length > 0 && (
               <div className="admin-table-wrap">
+                {selectedUsuarios.size > 0 && (
+                  <div className="bulk-jornada-bar">
+                    <span className="bulk-jornada-info">
+                      {selectedUsuarios.size} selecionado{selectedUsuarios.size > 1 ? 's' : ''}
+                    </span>
+                    <div className="bulk-jornada-controls">
+                      <label className="bulk-jornada-label">Alterar jornada para</label>
+                      <input
+                        type="number" min={1} max={24} step={0.5}
+                        className="bulk-jornada-input"
+                        value={bulkHoras}
+                        onChange={(e) => setBulkHoras(e.target.value)}
+                      />
+                      <span className="bulk-jornada-unit">h/dia</span>
+                      <button className="bulk-jornada-btn" onClick={handleBulkJornada} disabled={bulkLoading}>
+                        {bulkLoading ? <span className="spinner" /> : 'Aplicar'}
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <table className="admin-table">
                   <thead>
-                    <tr><th>Nome</th><th>PIN</th><th>Status</th><th>Ações</th></tr>
+                    <tr>
+                      <th style={{ width: 36 }}>
+                        <input type="checkbox" className="rel-checkbox"
+                          checked={allUsuariosSelected} onChange={toggleAllUsuarios} />
+                      </th>
+                      <th>Nome</th><th>PIN</th><th>Horas Diárias</th><th>Status</th><th>Ações</th>
+                    </tr>
                   </thead>
                   <tbody>
                     {usuarios.map((u) => (
-                      <tr key={u.pin}>
+                      <tr key={u.pin} className={selectedUsuarios.has(u.pin) ? 'rel-row--selected' : ''}>
+                        <td>
+                          <input type="checkbox" className="rel-checkbox"
+                            checked={selectedUsuarios.has(u.pin)}
+                            onChange={() => toggleSelectUsuario(u.pin)} />
+                        </td>
                         <td className="td-nome">{u.nome}</td>
                         <td><code>{u.pin}</code></td>
+                        <td>
+                          <span className="jornada-badge">{u.horas_diarias}h</span>
+                        </td>
                         <td>
                           <span className={`badge ${u.ativo ? 'badge--presente' : 'badge--ausente'}`}>
                             {u.ativo ? 'Ativo' : 'Inativo'}

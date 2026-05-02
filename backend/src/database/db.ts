@@ -19,6 +19,7 @@ export interface Usuario {
   pin: string;
   nome: string;
   ativo: boolean;
+  horas_diarias: number;
   created_at: string;
 }
 
@@ -155,19 +156,27 @@ export const db = {
     return data ?? undefined;
   },
 
-  async createUsuario(pin: string, nome: string): Promise<Usuario> {
+  async createUsuario(pin: string, nome: string, horasDiarias = 8): Promise<Usuario> {
     const { data, error } = await supabase
       .from('usuarios')
-      .insert({ pin, nome, ativo: true })
+      .insert({ pin, nome, ativo: true, horas_diarias: horasDiarias })
       .select()
       .single();
     if (error) raise(error, 'createUsuario');
     return data as Usuario;
   },
 
+  async bulkUpdateHorasDiarias(pins: string[], horasDiarias: number): Promise<void> {
+    const { error } = await supabase
+      .from('usuarios')
+      .update({ horas_diarias: horasDiarias })
+      .in('pin', pins);
+    if (error) raise(error, 'bulkUpdateHorasDiarias');
+  },
+
   async updateUsuario(
     id: string,
-    fields: Partial<Pick<Usuario, 'pin' | 'nome' | 'ativo'>>
+    fields: Partial<Pick<Usuario, 'pin' | 'nome' | 'ativo' | 'horas_diarias'>>
   ): Promise<Usuario> {
     const { data, error } = await supabase
       .from('usuarios')

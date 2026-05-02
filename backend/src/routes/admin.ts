@@ -172,7 +172,7 @@ router.get('/usuarios', authMiddleware, async (_req: Request, res: Response) => 
 
 // POST /api/admin/usuarios
 router.post('/usuarios', authMiddleware, async (req: Request, res: Response) => {
-  const { pin, nome } = req.body as { pin?: string; nome?: string };
+  const { pin, nome, horas_diarias } = req.body as { pin?: string; nome?: string; horas_diarias?: number };
 
   if (!pin || !/^\d{4,6}$/.test(pin)) {
     return res.status(400).json({ error: 'PIN inválido (4-6 dígitos numéricos).' });
@@ -182,13 +182,18 @@ router.post('/usuarios', authMiddleware, async (req: Request, res: Response) => 
     return res.status(400).json({ error: 'Nome inválido (mínimo 2 caracteres).' });
   }
 
+  const horas = Number(horas_diarias ?? 8);
+  if (isNaN(horas) || horas < 1 || horas > 24) {
+    return res.status(400).json({ error: 'Horas diárias inválidas (1–24).' });
+  }
+
   try {
     const existing = await db.findUsuario(pin);
     if (existing) {
       return res.status(409).json({ error: 'PIN já cadastrado.' });
     }
 
-    const usuario = await db.createUsuario(pin, nome.trim());
+    const usuario = await db.createUsuario(pin, nome.trim(), horas);
     return res.status(201).json({ usuario });
   } catch (err) {
     console.error('[POST /usuarios]', err);
@@ -196,10 +201,32 @@ router.post('/usuarios', authMiddleware, async (req: Request, res: Response) => 
   }
 });
 
+// PATCH /api/admin/usuarios/jornada  (bulk update horas_diarias)
+router.patch('/usuarios/jornada', authMiddleware, async (req: Request, res: Response) => {
+  const { pins, horas_diarias } = req.body as { pins?: string[]; horas_diarias?: number };
+
+  if (!Array.isArray(pins) || pins.length === 0) {
+    return res.status(400).json({ error: 'Lista de PINs obrigatória.' });
+  }
+
+  const horas = Number(horas_diarias);
+  if (isNaN(horas) || horas < 1 || horas > 24) {
+    return res.status(400).json({ error: 'Horas diárias inválidas (1–24).' });
+  }
+
+  try {
+    await db.bulkUpdateHorasDiarias(pins, horas);
+    return res.json({ ok: true, updated: pins.length });
+  } catch (err) {
+    console.error('[PATCH /usuarios/jornada]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
 // PUT /api/admin/usuarios/:pin
 router.put('/usuarios/:pin', authMiddleware, async (req: Request, res: Response) => {
   const { pin } = req.params;
-  const { nome, ativo, novoPin } = req.body as { nome?: string; ativo?: boolean; novoPin?: string };
+  const { nome, ativo, novoPin, horas_diarias } = req.body as { nome?: string; ativo?: boolean; novoPin?: string; horas_diarias?: number };
 
   try {
     const existing = await db.findUsuario(pin);
@@ -221,9 +248,10 @@ router.put('/usuarios/:pin', authMiddleware, async (req: Request, res: Response)
       return res.json({ usuario: updated });
     }
 
-    const fields: Partial<Pick<import('../database/db').Usuario, 'nome' | 'ativo'>> = {};
+    const fields: Partial<Pick<import('../database/db').Usuario, 'nome' | 'ativo' | 'horas_diarias'>> = {};
     if (nome !== undefined) fields.nome = nome.trim();
     if (ativo !== undefined) fields.ativo = ativo;
+    if (horas_diarias !== undefined) fields.horas_diarias = Number(horas_diarias);
 
     const updated = await db.updateUsuario(existing.id, fields);
     return res.json({ usuario: updated });

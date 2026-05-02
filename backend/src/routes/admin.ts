@@ -172,7 +172,7 @@ router.get('/usuarios', authMiddleware, async (_req: Request, res: Response) => 
 
 // POST /api/admin/usuarios
 router.post('/usuarios', authMiddleware, async (req: Request, res: Response) => {
-  const { pin, nome, horas_diarias } = req.body as { pin?: string; nome?: string; horas_diarias?: number };
+  const { pin, nome, horas_diarias, intervalo } = req.body as { pin?: string; nome?: string; horas_diarias?: number; intervalo?: number };
 
   if (!pin || !/^\d{4,6}$/.test(pin)) {
     return res.status(400).json({ error: 'PIN inválido (4-6 dígitos numéricos).' });
@@ -187,13 +187,18 @@ router.post('/usuarios', authMiddleware, async (req: Request, res: Response) => 
     return res.status(400).json({ error: 'Jornada inválida (1h–24h).' });
   }
 
+  const intMin = Number(intervalo ?? 60);
+  if (isNaN(intMin) || intMin < 0 || intMin > 480) {
+    return res.status(400).json({ error: 'Intervalo inválido (0–8h).' });
+  }
+
   try {
     const existing = await db.findUsuario(pin);
     if (existing) {
       return res.status(409).json({ error: 'PIN já cadastrado.' });
     }
 
-    const usuario = await db.createUsuario(pin, nome.trim(), minutos);
+    const usuario = await db.createUsuario(pin, nome.trim(), minutos, intMin);
     return res.status(201).json({ usuario });
   } catch (err) {
     console.error('[POST /usuarios]', err);
@@ -226,7 +231,7 @@ router.patch('/usuarios/jornada', authMiddleware, async (req: Request, res: Resp
 // PUT /api/admin/usuarios/:pin
 router.put('/usuarios/:pin', authMiddleware, async (req: Request, res: Response) => {
   const { pin } = req.params;
-  const { nome, ativo, novoPin, horas_diarias } = req.body as { nome?: string; ativo?: boolean; novoPin?: string; horas_diarias?: number };
+  const { nome, ativo, novoPin, horas_diarias, intervalo } = req.body as { nome?: string; ativo?: boolean; novoPin?: string; horas_diarias?: number; intervalo?: number };
 
   try {
     const existing = await db.findUsuario(pin);
@@ -248,10 +253,11 @@ router.put('/usuarios/:pin', authMiddleware, async (req: Request, res: Response)
       return res.json({ usuario: updated });
     }
 
-    const fields: Partial<Pick<import('../database/db').Usuario, 'nome' | 'ativo' | 'horas_diarias'>> = {};
+    const fields: Partial<Pick<import('../database/db').Usuario, 'nome' | 'ativo' | 'horas_diarias' | 'intervalo'>> = {};
     if (nome !== undefined) fields.nome = nome.trim();
     if (ativo !== undefined) fields.ativo = ativo;
     if (horas_diarias !== undefined) fields.horas_diarias = Number(horas_diarias);
+    if (intervalo !== undefined) fields.intervalo = Number(intervalo);
 
     const updated = await db.updateUsuario(existing.id, fields);
     return res.json({ usuario: updated });

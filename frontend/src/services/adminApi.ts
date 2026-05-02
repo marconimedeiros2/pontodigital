@@ -45,6 +45,7 @@ export interface Usuario {
   nome: string;
   ativo: boolean;
   horas_diarias: number;
+  intervalo: number;
   created_at: string;
 }
 
@@ -80,13 +81,13 @@ export const adminApi = {
   listUsuarios: () =>
     request<{ usuarios: Usuario[] }>(`${BASE}/usuarios`),
 
-  createUsuario: (pin: string, nome: string, horas_diarias: number) =>
+  createUsuario: (pin: string, nome: string, horas_diarias: number, intervalo: number) =>
     request<{ usuario: Usuario }>(`${BASE}/usuarios`, {
       method: 'POST',
-      body: JSON.stringify({ pin, nome, horas_diarias }),
+      body: JSON.stringify({ pin, nome, horas_diarias, intervalo }),
     }),
 
-  updateUsuario: (pin: string, data: Partial<{ nome: string; ativo: boolean; novoPin: string; horas_diarias: number }>) =>
+  updateUsuario: (pin: string, data: Partial<{ nome: string; ativo: boolean; novoPin: string; horas_diarias: number; intervalo: number }>) =>
     request<{ usuario: Usuario }>(`${BASE}/usuarios/${pin}`, {
       method: 'PUT',
       body: JSON.stringify(data),

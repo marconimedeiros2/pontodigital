@@ -20,6 +20,7 @@ function EditModal({ usuario, onClose, onSaved }: EditModalProps) {
   const [novoPin, setNovoPin] = useState(usuario.pin);
   const [ativo, setAtivo] = useState(usuario.ativo);
   const [horasDiarias, setHorasDiarias] = useState(minutesToHHMM(usuario.horas_diarias ?? 440));
+  const [intervaloModal, setIntervaloModal] = useState(minutesToHHMM(usuario.intervalo ?? 60));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -30,7 +31,9 @@ function EditModal({ usuario, onClose, onSaved }: EditModalProps) {
     if (!nome.trim()) { setError('Nome é obrigatório.'); return; }
     if (!/^\d{4,6}$/.test(novoPin)) { setError('PIN deve ter entre 4 e 6 dígitos numéricos.'); return; }
     const minutos = hhmmToMinutes(horasDiarias);
-    if (isNaN(minutos) || minutos < 60 || minutos > 1440) { setError('Jornada inválida. Use o formato HH:MM (ex: 7:20).'); return; }
+    if (isNaN(minutos) || minutos < 60 || minutos > 1440) { setError('Jornada inválida. Use o formato H:MM (ex: 7:20).'); return; }
+    const intMin = hhmmToMinutes(intervaloModal);
+    if (isNaN(intMin) || intMin < 0 || intMin > 480) { setError('Intervalo inválido. Use o formato H:MM (ex: 1:00).'); return; }
 
     setLoading(true);
     try {
@@ -38,6 +41,7 @@ function EditModal({ usuario, onClose, onSaved }: EditModalProps) {
         nome,
         ativo,
         horas_diarias: minutos,
+        intervalo: intMin,
         ...(pinChanged ? { novoPin } : {}),
       });
       onSaved();
@@ -85,16 +89,24 @@ function EditModal({ usuario, onClose, onSaved }: EditModalProps) {
           )}
         </div>
 
-        <div className="input-group" style={{ marginBottom: 14 }}>
-          <label className="input-label">Jornada Diária</label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input
-              type="text" pattern="\d+:[0-5]\d" placeholder="7:20"
-              className="text-input" style={{ width: 100 }}
-              value={horasDiarias}
-              onChange={(e) => setHorasDiarias(e.target.value)}
-            />
-            <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>h:mm / dia</span>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+          <div className="input-group">
+            <label className="input-label">Jornada (H:MM)</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input type="text" pattern="\d+:[0-5]\d" placeholder="7:20"
+                className="text-input" style={{ width: 80 }}
+                value={horasDiarias} onChange={(e) => setHorasDiarias(e.target.value)} />
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>h:mm</span>
+            </div>
+          </div>
+          <div className="input-group">
+            <label className="input-label">Intervalo (H:MM)</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input type="text" pattern="\d+:[0-5]\d" placeholder="1:00"
+                className="text-input" style={{ width: 80 }}
+                value={intervaloModal} onChange={(e) => setIntervaloModal(e.target.value)} />
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>h:mm</span>
+            </div>
           </div>
         </div>
 
@@ -467,6 +479,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [novoPin, setNovoPin] = useState('');
   const [novoNome, setNovoNome] = useState('');
   const [novoHoras, setNovoHoras] = useState('7:20');
+  const [novoIntervalo, setNovoIntervalo] = useState('1:00');
   const [usuariosLoading, setUsuariosLoading] = useState(false);
   const [usuariosError, setUsuariosError] = useState('');
   const [editingUsuario, setEditingUsuario] = useState<Usuario | null>(null);
@@ -536,10 +549,12 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     setUsuariosError('');
     if (!novoPin || !novoNome.trim()) { setUsuariosError('Preencha PIN e Nome.'); return; }
     const minutos = hhmmToMinutes(novoHoras);
-    if (isNaN(minutos) || minutos < 60 || minutos > 1440) { setUsuariosError('Jornada inválida. Use o formato HH:MM (ex: 7:20).'); return; }
+    if (isNaN(minutos) || minutos < 60 || minutos > 1440) { setUsuariosError('Jornada inválida. Use o formato H:MM (ex: 7:20).'); return; }
+    const intMin = hhmmToMinutes(novoIntervalo);
+    if (isNaN(intMin) || intMin < 0 || intMin > 480) { setUsuariosError('Intervalo inválido. Use o formato H:MM (ex: 1:00).'); return; }
     try {
-      await adminApi.createUsuario(novoPin, novoNome, minutos);
-      setNovoPin(''); setNovoNome(''); setNovoHoras(escalaPadrao);
+      await adminApi.createUsuario(novoPin, novoNome, minutos, intMin);
+      setNovoPin(''); setNovoNome(''); setNovoHoras(escalaPadrao); setNovoIntervalo(intervaloPadrao);
       await loadUsuarios();
     } catch (e) { setUsuariosError(e instanceof Error ? e.message : 'Erro'); }
   };
@@ -866,6 +881,12 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                     value={novoHoras} onChange={(e) => setNovoHoras(e.target.value)}
                     className="text-input" style={{ width: '100%' }} />
                 </div>
+                <div className="input-group">
+                  <label className="input-label">Intervalo (h:mm)</label>
+                  <input type="text" pattern="\d+:[0-5]\d" placeholder="1:00"
+                    value={novoIntervalo} onChange={(e) => setNovoIntervalo(e.target.value)}
+                    className="text-input" style={{ width: '100%' }} />
+                </div>
                 <button className="confirm-btn" style={{ marginTop: 8 }} onClick={handleAddUsuario}>
                   Adicionar
                 </button>
@@ -908,7 +929,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                         <input type="checkbox" className="rel-checkbox"
                           checked={allUsuariosSelected} onChange={toggleAllUsuarios} />
                       </th>
-                      <th>Nome</th><th>PIN</th><th>Horas Diárias</th><th>Status</th><th>Ações</th>
+                      <th>Nome</th><th>PIN</th><th>Horas Diárias</th><th>Intervalo</th><th>Status</th><th>Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -923,6 +944,11 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                         <td><code>{u.pin}</code></td>
                         <td>
                           <span className="jornada-badge">{minutesToHHMM(u.horas_diarias ?? 440)}</span>
+                        </td>
+                        <td>
+                          <span className="jornada-badge" style={{ background: 'rgba(217,119,6,0.1)', color: '#d97706', borderColor: 'rgba(217,119,6,0.25)' }}>
+                            {minutesToHHMM(u.intervalo ?? 60)}
+                          </span>
                         </td>
                         <td>
                           <button

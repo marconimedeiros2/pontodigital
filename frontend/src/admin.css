@@ -358,7 +358,7 @@ code {
 
 .add-user-form {
   display: grid;
-  grid-template-columns: 1fr 2fr 1fr auto;
+  grid-template-columns: 1fr 2fr 1fr 1fr auto;
   gap: 12px;
   align-items: flex-end;
 }

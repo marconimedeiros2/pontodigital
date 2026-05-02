@@ -4,21 +4,14 @@ import { db } from '../database/db';
 
 const router = Router();
 
-const sessions = new Map<string, number>();
-const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+const sessions = new Set<string>();
 
 function generateToken(): string {
   return crypto.randomBytes(32).toString('hex');
 }
 
 function isValidToken(token: string): boolean {
-  const exp = sessions.get(token);
-  if (!exp) return false;
-  if (Date.now() > exp) {
-    sessions.delete(token);
-    return false;
-  }
-  return true;
+  return sessions.has(token);
 }
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
@@ -45,7 +38,7 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     const token = generateToken();
-    sessions.set(token, Date.now() + SESSION_TTL_MS);
+    sessions.add(token);
     return res.json({ token });
   } catch (err) {
     console.error('[POST /login]', err);
@@ -56,7 +49,7 @@ router.post('/login', async (req: Request, res: Response) => {
 // POST /api/admin/logout
 router.post('/logout', authMiddleware, (req: Request, res: Response) => {
   const token = req.headers.authorization?.replace('Bearer ', '') ?? '';
-  sessions.delete(token);
+  sessions.delete(token as string);
   return res.json({ ok: true });
 });
 

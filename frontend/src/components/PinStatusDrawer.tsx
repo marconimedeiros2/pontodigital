@@ -5,8 +5,10 @@ import { STEP_ORDER, STEP_LABELS } from '../types';
 const STEP_KEYS = ['hora_inicial', 'inicio_intervalo', 'fim_intervalo', 'hora_final'] as const;
 
 function extractTime(val: string): string {
-  const t = val.includes(' ') ? val.split(' ')[1] : val;
-  return t.substring(0, 5);
+  const timePart = val.includes(' ') ? val.split(' ')[1] : val;
+  const [h, m] = timePart.split(':').map(Number);
+  const local = ((h - 3) + 24) % 24;
+  return `${String(local).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 function formatDate(d: string): string {

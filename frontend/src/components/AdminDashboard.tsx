@@ -339,9 +339,47 @@ const today = new Date().toISOString().split('T')[0];
 
 type TimeField = 'hora_inicial' | 'inicio_intervalo' | 'fim_intervalo' | 'hora_final';
 
-function toInputVal(val: string | null) { return val ? val.slice(0, 16).replace(' ', 'T') : ''; }
-function fromInputVal(val: string): string | null { return val ? val.replace('T', ' ') + ':00' : null; }
-function displayTime(val: string | null) { return val ? val.slice(11, 16) : '—'; }
+const UTC_OFFSET = -3;
+
+function shiftTime(utcStr: string, offsetH: number): { date: string; hhmm: string; hhmmss: string } {
+  const [datePart, timePart] = utcStr.includes(' ') ? utcStr.split(' ') : ['', utcStr];
+  const [h, m, s = '00'] = timePart.split(':');
+  let lh = parseInt(h, 10) + offsetH;
+  let ld = datePart;
+  if (lh < 0) {
+    lh += 24;
+    if (ld) { const d = new Date(ld + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - 1); ld = d.toISOString().split('T')[0]; }
+  } else if (lh >= 24) {
+    lh -= 24;
+    if (ld) { const d = new Date(ld + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 1); ld = d.toISOString().split('T')[0]; }
+  }
+  const hhmm = `${String(lh).padStart(2, '0')}:${m.padStart(2, '0')}`;
+  return { date: ld, hhmm, hhmmss: `${hhmm}:${s}` };
+}
+
+function displayTime(val: string | null): string {
+  if (!val) return '—';
+  return shiftTime(val, UTC_OFFSET).hhmm;
+}
+
+function localTimestamp(val: string | null): string {
+  if (!val) return '';
+  const { date, hhmmss } = shiftTime(val, UTC_OFFSET);
+  return date ? `${date} ${hhmmss}` : hhmmss;
+}
+
+function toInputVal(val: string | null): string {
+  if (!val) return '';
+  const { date, hhmm } = shiftTime(val, UTC_OFFSET);
+  return date ? `${date}T${hhmm}` : hhmm;
+}
+
+function fromInputVal(val: string): string | null {
+  if (!val) return null;
+  const [datePart, timePart] = val.split('T');
+  const { date, hhmmss } = shiftTime(`${datePart} ${timePart}:00`, -UTC_OFFSET);
+  return `${date} ${hhmmss}`;
+}
 
 function TimeCell({ value, onSave }: { value: string | null; onSave: (v: string | null) => Promise<void> }) {
   const [editing, setEditing] = useState(false);
@@ -699,7 +737,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                             {(['hora_inicial', 'inicio_intervalo', 'fim_intervalo', 'hora_final'] as const).map((f) => (
                               <td key={f}>
                                 {r[f]
-                                  ? <span className="dash-time" title={r[f]!}>{displayTime(r[f])}</span>
+                                  ? <span className="dash-time" title={localTimestamp(r[f])}>{displayTime(r[f])}</span>
                                   : '—'}
                               </td>
                             ))}

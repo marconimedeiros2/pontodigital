@@ -72,8 +72,11 @@ router.post('/registrar', async (req: Request, res: Response) => {
     let updated: Registro;
 
     if (!registro) {
-      // No ongoing session — start a new one with hora_inicial
-      updated = await db.insertRecord(usuario.id, pin, dataHoje, { hora_inicial: agora });
+      // No ongoing session — start a new one with hora_inicial; snapshot current daily hours
+      updated = await db.insertRecord(usuario.id, pin, dataHoje, {
+        hora_inicial: agora,
+        horas_diarias: usuario.horas_diarias ?? null,
+      });
     } else {
       // Continue existing session — nextStep is always non-null here
       updated = await db.updateById(registro.id, { [nextStep!]: agora });

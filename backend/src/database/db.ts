@@ -10,6 +10,7 @@ export interface Registro {
   inicio_intervalo: string | null;
   fim_intervalo: string | null;
   hora_final: string | null;
+  horas_diarias: number | null;
   oculto: boolean;
   created_at: string;
 }

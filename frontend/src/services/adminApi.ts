@@ -129,6 +129,15 @@ export const adminApi = {
   hideRegistro: (id: number) =>
     request<{ ok: boolean }>(`${BASE}/registros/${id}`, { method: 'DELETE' }),
 
+  getEscala: () =>
+    request<{ escala_padrao: number }>(`${BASE}/configuracoes/escala`),
+
+  setEscala: (escala_padrao: number) =>
+    request<{ ok: boolean }>(`${BASE}/configuracoes/escala`, {
+      method: 'PUT',
+      body: JSON.stringify({ escala_padrao }),
+    }),
+
   saveToken: (token: string) => sessionStorage.setItem('admin_token', token),
   clearToken: () => sessionStorage.removeItem('admin_token'),
   hasToken: () => !!sessionStorage.getItem('admin_token'),

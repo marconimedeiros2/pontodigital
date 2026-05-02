@@ -234,4 +234,22 @@ export const db = {
       .eq('id', 1);
     if (error) raise(error, 'changePassword');
   },
+
+  async getEscalaPadrao(): Promise<number> {
+    const { data, error } = await supabase
+      .from('admin_config')
+      .select('escala_padrao')
+      .eq('id', 1)
+      .single();
+    if (error) return 440;
+    return (data as { escala_padrao: number }).escala_padrao ?? 440;
+  },
+
+  async setEscalaPadrao(minutos: number): Promise<void> {
+    const { error } = await supabase
+      .from('admin_config')
+      .update({ escala_padrao: minutos })
+      .eq('id', 1);
+    if (error) raise(error, 'setEscalaPadrao');
+  },
 };

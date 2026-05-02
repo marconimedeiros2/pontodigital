@@ -182,9 +182,9 @@ router.post('/usuarios', authMiddleware, async (req: Request, res: Response) => 
     return res.status(400).json({ error: 'Nome inválido (mínimo 2 caracteres).' });
   }
 
-  const horas = Number(horas_diarias ?? 8);
-  if (isNaN(horas) || horas < 1 || horas > 24) {
-    return res.status(400).json({ error: 'Horas diárias inválidas (1–24).' });
+  const minutos = Number(horas_diarias ?? 440);
+  if (isNaN(minutos) || minutos < 60 || minutos > 1440) {
+    return res.status(400).json({ error: 'Jornada inválida (1h–24h).' });
   }
 
   try {
@@ -193,7 +193,7 @@ router.post('/usuarios', authMiddleware, async (req: Request, res: Response) => 
       return res.status(409).json({ error: 'PIN já cadastrado.' });
     }
 
-    const usuario = await db.createUsuario(pin, nome.trim(), horas);
+    const usuario = await db.createUsuario(pin, nome.trim(), minutos);
     return res.status(201).json({ usuario });
   } catch (err) {
     console.error('[POST /usuarios]', err);
@@ -209,13 +209,13 @@ router.patch('/usuarios/jornada', authMiddleware, async (req: Request, res: Resp
     return res.status(400).json({ error: 'Lista de PINs obrigatória.' });
   }
 
-  const horas = Number(horas_diarias);
-  if (isNaN(horas) || horas < 1 || horas > 24) {
-    return res.status(400).json({ error: 'Horas diárias inválidas (1–24).' });
+  const minutos = Number(horas_diarias);
+  if (isNaN(minutos) || minutos < 60 || minutos > 1440) {
+    return res.status(400).json({ error: 'Jornada inválida (1h–24h).' });
   }
 
   try {
-    await db.bulkUpdateHorasDiarias(pins, horas);
+    await db.bulkUpdateHorasDiarias(pins, minutos);
     return res.json({ ok: true, updated: pins.length });
   } catch (err) {
     console.error('[PATCH /usuarios/jornada]', err);
@@ -351,6 +351,33 @@ router.delete('/usuarios/:pin', authMiddleware, async (req: Request, res: Respon
     return res.json({ ok: true });
   } catch (err) {
     console.error('[DELETE /usuarios/:pin]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// GET /api/admin/configuracoes/escala
+router.get('/configuracoes/escala', authMiddleware, async (_req: Request, res: Response) => {
+  try {
+    const escala_padrao = await db.getEscalaPadrao();
+    return res.json({ escala_padrao });
+  } catch (err) {
+    console.error('[GET /configuracoes/escala]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// PUT /api/admin/configuracoes/escala
+router.put('/configuracoes/escala', authMiddleware, async (req: Request, res: Response) => {
+  const { escala_padrao } = req.body as { escala_padrao?: number };
+  const minutos = Number(escala_padrao);
+  if (isNaN(minutos) || minutos < 60 || minutos > 1440) {
+    return res.status(400).json({ error: 'Escala inválida (1h–24h).' });
+  }
+  try {
+    await db.setEscalaPadrao(minutos);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[PUT /configuracoes/escala]', err);
     return res.status(500).json({ error: 'Erro interno.' });
   }
 });

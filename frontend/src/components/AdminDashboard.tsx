@@ -19,7 +19,7 @@ function EditModal({ usuario, onClose, onSaved }: EditModalProps) {
   const [nome, setNome] = useState(usuario.nome);
   const [novoPin, setNovoPin] = useState(usuario.pin);
   const [ativo, setAtivo] = useState(usuario.ativo);
-  const [horasDiarias, setHorasDiarias] = useState(String(usuario.horas_diarias ?? 8));
+  const [horasDiarias, setHorasDiarias] = useState(minutesToHHMM(usuario.horas_diarias ?? 440));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -29,15 +29,15 @@ function EditModal({ usuario, onClose, onSaved }: EditModalProps) {
     setError('');
     if (!nome.trim()) { setError('Nome é obrigatório.'); return; }
     if (!/^\d{4,6}$/.test(novoPin)) { setError('PIN deve ter entre 4 e 6 dígitos numéricos.'); return; }
-    const horas = parseFloat(horasDiarias);
-    if (isNaN(horas) || horas < 1 || horas > 24) { setError('Horas diárias inválidas (1–24).'); return; }
+    const minutos = hhmmToMinutes(horasDiarias);
+    if (isNaN(minutos) || minutos < 60 || minutos > 1440) { setError('Jornada inválida. Use o formato HH:MM (ex: 7:20).'); return; }
 
     setLoading(true);
     try {
       await adminApi.updateUsuario(usuario.pin, {
         nome,
         ativo,
-        horas_diarias: horas,
+        horas_diarias: minutos,
         ...(pinChanged ? { novoPin } : {}),
       });
       onSaved();
@@ -86,15 +86,15 @@ function EditModal({ usuario, onClose, onSaved }: EditModalProps) {
         </div>
 
         <div className="input-group" style={{ marginBottom: 14 }}>
-          <label className="input-label">Horas Diárias</label>
+          <label className="input-label">Jornada Diária</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <input
-              type="number" min={1} max={24} step={0.5}
+              type="text" pattern="\d+:[0-5]\d" placeholder="7:20"
               className="text-input" style={{ width: 100 }}
               value={horasDiarias}
               onChange={(e) => setHorasDiarias(e.target.value)}
             />
-            <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>h / dia</span>
+            <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>h:mm / dia</span>
           </div>
         </div>
 
@@ -174,6 +174,19 @@ function formatDate(d: string) {
   const [y, m, day] = d.split('-');
   return new Date(Number(y), Number(m) - 1, Number(day)).toLocaleDateString('pt-BR');
 }
+
+function minutesToHHMM(min: number): string {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${h}:${String(m).padStart(2, '0')}`;
+}
+
+function hhmmToMinutes(str: string): number {
+  const [h, m] = str.split(':').map(Number);
+  if (isNaN(h) || isNaN(m) || m < 0 || m > 59) return NaN;
+  return h * 60 + m;
+}
+
 
 function StatusBadge({ reg }: { reg: RegistroAdmin }) {
   if (reg.hora_final)                                    return <span className="badge badge--saiu">Saída</span>;
@@ -453,12 +466,12 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [novoPin, setNovoPin] = useState('');
   const [novoNome, setNovoNome] = useState('');
-  const [novoHoras, setNovoHoras] = useState('8');
+  const [novoHoras, setNovoHoras] = useState('7:20');
   const [usuariosLoading, setUsuariosLoading] = useState(false);
   const [usuariosError, setUsuariosError] = useState('');
   const [editingUsuario, setEditingUsuario] = useState<Usuario | null>(null);
   const [selectedUsuarios, setSelectedUsuarios] = useState<Set<string>>(new Set());
-  const [bulkHoras, setBulkHoras] = useState('8');
+  const [bulkHoras, setBulkHoras] = useState('7:20');
   const [bulkLoading, setBulkLoading] = useState(false);
 
   // Relatório state
@@ -479,6 +492,9 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [confirmarSenha, setConfirmarSenha] = useState('');
   const [configMsg, setConfigMsg] = useState('');
   const [configError, setConfigError] = useState('');
+  const [escalaPadrao, setEscalaPadrao] = useState('7:20');
+  const [escalaMsg, setEscalaMsg] = useState('');
+  const [escalaError, setEscalaError] = useState('');
 
   const loadDashboard = useCallback(async () => {
     setDashLoading(true);
@@ -499,6 +515,15 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   useEffect(() => { if (tab === 'dashboard') loadDashboard(); }, [tab, loadDashboard]);
   useEffect(() => { if (tab === 'usuarios') loadUsuarios(); }, [tab, loadUsuarios]);
 
+  useEffect(() => {
+    adminApi.getEscala().then(({ escala_padrao }) => {
+      const hhmm = minutesToHHMM(escala_padrao);
+      setEscalaPadrao(hhmm);
+      setNovoHoras(hhmm);
+      setBulkHoras(hhmm);
+    }).catch(() => {});
+  }, []);
+
   const handleLogout = async () => {
     try { await adminApi.logout(); } catch { /* ignore */ }
     adminApi.clearToken();
@@ -508,11 +533,11 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const handleAddUsuario = async () => {
     setUsuariosError('');
     if (!novoPin || !novoNome.trim()) { setUsuariosError('Preencha PIN e Nome.'); return; }
-    const horas = parseFloat(novoHoras);
-    if (isNaN(horas) || horas < 1 || horas > 24) { setUsuariosError('Horas diárias inválidas (1–24).'); return; }
+    const minutos = hhmmToMinutes(novoHoras);
+    if (isNaN(minutos) || minutos < 60 || minutos > 1440) { setUsuariosError('Jornada inválida. Use o formato HH:MM (ex: 7:20).'); return; }
     try {
-      await adminApi.createUsuario(novoPin, novoNome, horas);
-      setNovoPin(''); setNovoNome(''); setNovoHoras('8');
+      await adminApi.createUsuario(novoPin, novoNome, minutos);
+      setNovoPin(''); setNovoNome(''); setNovoHoras(escalaPadrao);
       await loadUsuarios();
     } catch (e) { setUsuariosError(e instanceof Error ? e.message : 'Erro'); }
   };
@@ -525,16 +550,28 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     setSelectedUsuarios(allUsuariosSelected ? new Set() : new Set(usuarios.map((u) => u.pin)));
 
   const handleBulkJornada = async () => {
-    const horas = parseFloat(bulkHoras);
-    if (isNaN(horas) || horas < 1 || horas > 24) return;
-    if (!confirm(`Alterar jornada de ${selectedUsuarios.size} funcionário(s) para ${horas}h?`)) return;
+    const minutos = hhmmToMinutes(bulkHoras);
+    if (isNaN(minutos) || minutos < 60 || minutos > 1440) return;
+    if (!confirm(`Alterar jornada de ${selectedUsuarios.size} funcionário(s) para ${minutesToHHMM(minutos)}?`)) return;
     setBulkLoading(true);
     try {
-      await adminApi.bulkUpdateJornada([...selectedUsuarios], horas);
-      setUsuarios((prev) => prev.map((u) => selectedUsuarios.has(u.pin) ? { ...u, horas_diarias: horas } : u));
+      await adminApi.bulkUpdateJornada([...selectedUsuarios], minutos);
+      setUsuarios((prev) => prev.map((u) => selectedUsuarios.has(u.pin) ? { ...u, horas_diarias: minutos } : u));
       setSelectedUsuarios(new Set());
     } catch (e) { setUsuariosError(e instanceof Error ? e.message : 'Erro ao atualizar'); }
     finally { setBulkLoading(false); }
+  };
+
+  const handleSaveEscala = async () => {
+    setEscalaError(''); setEscalaMsg('');
+    const minutos = hhmmToMinutes(escalaPadrao);
+    if (isNaN(minutos) || minutos < 60 || minutos > 1440) { setEscalaError('Jornada inválida. Use o formato HH:MM (ex: 7:20).'); return; }
+    try {
+      await adminApi.setEscala(minutos);
+      setNovoHoras(escalaPadrao);
+      setBulkHoras(escalaPadrao);
+      setEscalaMsg('Escala padrão salva com sucesso!');
+    } catch { setEscalaError('Erro ao salvar escala.'); }
   };
 
   const handleToggleAtivo = async (u: Usuario) => {
@@ -820,8 +857,8 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                     placeholder="Nome completo" className="text-input" />
                 </div>
                 <div className="input-group">
-                  <label className="input-label">Jornada (h/dia)</label>
-                  <input type="number" min={1} max={24} step={0.5}
+                  <label className="input-label">Jornada (h:mm)</label>
+                  <input type="text" pattern="\d+:[0-5]\d" placeholder="7:20"
                     value={novoHoras} onChange={(e) => setNovoHoras(e.target.value)}
                     className="text-input" style={{ width: '100%' }} />
                 </div>
@@ -848,12 +885,12 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                     <div className="bulk-jornada-controls">
                       <label className="bulk-jornada-label">Alterar jornada para</label>
                       <input
-                        type="number" min={1} max={24} step={0.5}
+                        type="text" pattern="\d+:[0-5]\d" placeholder="7:20"
                         className="bulk-jornada-input"
                         value={bulkHoras}
                         onChange={(e) => setBulkHoras(e.target.value)}
                       />
-                      <span className="bulk-jornada-unit">h/dia</span>
+                      <span className="bulk-jornada-unit">h:mm</span>
                       <button className="bulk-jornada-btn" onClick={handleBulkJornada} disabled={bulkLoading}>
                         {bulkLoading ? <span className="spinner" /> : 'Aplicar'}
                       </button>
@@ -881,7 +918,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                         <td className="td-nome">{u.nome}</td>
                         <td><code>{u.pin}</code></td>
                         <td>
-                          <span className="jornada-badge">{u.horas_diarias}h</span>
+                          <span className="jornada-badge">{minutesToHHMM(u.horas_diarias ?? 440)}</span>
                         </td>
                         <td>
                           <span className={`badge ${u.ativo ? 'badge--presente' : 'badge--ausente'}`}>
@@ -1081,6 +1118,30 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
         {tab === 'configuracoes' && (
           <div className="admin-section">
             <div className="admin-section-header"><h2>Configurações</h2></div>
+
+            <div className="admin-card" style={{ maxWidth: 440 }}>
+              <h3 className="admin-card-title">Escala Padrão</h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 16 }}>
+                Jornada padrão aplicada ao cadastrar novos funcionários. Use o formato <strong>H:MM</strong> (ex: 7:20).
+              </p>
+              <div className="input-group">
+                <label className="input-label">Jornada padrão (H:MM)</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="text" pattern="\d+:[0-5]\d" placeholder="7:20"
+                    className="text-input" style={{ width: 120 }}
+                    value={escalaPadrao}
+                    onChange={(e) => { setEscalaPadrao(e.target.value); setEscalaMsg(''); setEscalaError(''); }}
+                  />
+                  <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>h:mm / dia</span>
+                </div>
+              </div>
+              {escalaError && <p className="error-msg" style={{ marginTop: 8 }}>{escalaError}</p>}
+              {escalaMsg && <p style={{ color: 'var(--success)', marginTop: 8, fontWeight: 600 }}>{escalaMsg}</p>}
+              <button className="confirm-btn" style={{ marginTop: 16 }} onClick={handleSaveEscala}>
+                Salvar Escala
+              </button>
+            </div>
 
             <div className="admin-card" style={{ maxWidth: 440 }}>
               <h3 className="admin-card-title">Alterar Senha do Admin</h3>

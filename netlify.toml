@@ -5,6 +5,6 @@
 
 [[redirects]]
   from = "/api/*"
-  to = "/api/:splat"
+  to = "https://zico-lanches.netlify.app/api/:splat"
   status = 200
   force = true

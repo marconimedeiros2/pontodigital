@@ -16,6 +16,12 @@ app.use(cors({
 
 app.use(express.json());
 
+// Log API requests
+app.use('/api', (req, _res, next) => {
+  console.log(`[API] ${req.method} ${req.path}`);
+  next();
+});
+
 // ROTAS DA API (mantém antes de tudo)
 app.use('/api/ponto', pontoRoutes);
 app.use('/api/admin', adminRoutes);

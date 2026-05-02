@@ -619,6 +619,12 @@ code {
 .ss-option--selected { background: var(--primary-light); color: var(--primary); font-weight: 600; }
 .ss-empty { padding: 12px 14px; color: var(--text-muted); font-size: 0.88rem; }
 
+/* Dashboard time cell */
+.dash-time {
+  cursor: default;
+  border-bottom: 1px dashed var(--border);
+}
+
 .admin-loading { display: flex; justify-content: center; padding: 40px; }
 
 .admin-empty {

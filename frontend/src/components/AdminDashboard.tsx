@@ -696,10 +696,13 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                           <tr key={r.id}>
                             <td className="td-nome">{r.nome}</td>
                             <td><code>{r.pin}</code></td>
-                            <td>{r.hora_inicial || '—'}</td>
-                            <td>{r.inicio_intervalo || '—'}</td>
-                            <td>{r.fim_intervalo || '—'}</td>
-                            <td>{r.hora_final || '—'}</td>
+                            {(['hora_inicial', 'inicio_intervalo', 'fim_intervalo', 'hora_final'] as const).map((f) => (
+                              <td key={f}>
+                                {r[f]
+                                  ? <span className="dash-time" title={r[f]!}>{displayTime(r[f])}</span>
+                                  : '—'}
+                              </td>
+                            ))}
                             <td><strong>{calcWorkTime(r)}</strong></td>
                             <td><StatusBadge reg={r} /></td>
                           </tr>

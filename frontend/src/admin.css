@@ -442,6 +442,39 @@ code {
 [data-theme='dark'] .btn-delete-selected { background: #3f1212; border-color: #7f1d1d; color: #fca5a5; }
 [data-theme='dark'] .btn-delete-selected:hover { background: #7f1d1d; }
 
+/* Status toggle switch */
+.status-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.status-toggle--on  { background: #22c55e; }
+.status-toggle--off { background: #cbd5e1; }
+
+.status-toggle-knob {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  transition: left 0.2s;
+}
+
+.status-toggle--on  .status-toggle-knob { left: 21px; }
+.status-toggle--off .status-toggle-knob { left: 3px; }
+
+[data-theme='dark'] .status-toggle--off { background: #475569; }
+
 /* Icon action buttons */
 .action-btns { display: flex; gap: 4px; align-items: center; }
 

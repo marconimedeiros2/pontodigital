@@ -921,9 +921,13 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                           <span className="jornada-badge">{minutesToHHMM(u.horas_diarias ?? 440)}</span>
                         </td>
                         <td>
-                          <span className={`badge ${u.ativo ? 'badge--presente' : 'badge--ausente'}`}>
-                            {u.ativo ? 'Ativo' : 'Inativo'}
-                          </span>
+                          <button
+                            className={`status-toggle ${u.ativo ? 'status-toggle--on' : 'status-toggle--off'}`}
+                            onClick={() => handleToggleAtivo(u)}
+                            title={u.ativo ? 'Desativar' : 'Ativar'}
+                          >
+                            <span className="status-toggle-knob" />
+                          </button>
                         </td>
                         <td>
                           <div className="action-btns">
@@ -933,21 +937,6 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                               </svg>
-                            </button>
-                            <button className="icon-btn icon-btn--toggle"
-                              onClick={() => handleToggleAtivo(u)}
-                              title={u.ativo ? 'Desativar' : 'Ativar'}>
-                              {u.ativo ? (
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <rect x="1" y="5" width="22" height="14" rx="7"/>
-                                  <circle cx="16" cy="12" r="3" fill="currentColor" stroke="none"/>
-                                </svg>
-                              ) : (
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <rect x="1" y="5" width="22" height="14" rx="7"/>
-                                  <circle cx="8" cy="12" r="3" fill="currentColor" stroke="none"/>
-                                </svg>
-                              )}
                             </button>
                             <button className="icon-btn icon-btn--delete"
                               onClick={() => handleDeleteUsuario(u.pin)} title="Remover">

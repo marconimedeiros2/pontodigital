@@ -228,6 +228,28 @@ router.patch('/usuarios/jornada', authMiddleware, async (req: Request, res: Resp
   }
 });
 
+// PATCH /api/admin/usuarios/intervalo  (bulk update intervalo)
+router.patch('/usuarios/intervalo', authMiddleware, async (req: Request, res: Response) => {
+  const { pins, intervalo } = req.body as { pins?: string[]; intervalo?: number };
+
+  if (!Array.isArray(pins) || pins.length === 0) {
+    return res.status(400).json({ error: 'Lista de PINs obrigatória.' });
+  }
+
+  const minutos = Number(intervalo);
+  if (isNaN(minutos) || minutos < 0 || minutos > 480) {
+    return res.status(400).json({ error: 'Intervalo inválido (0–8h).' });
+  }
+
+  try {
+    await db.bulkUpdateIntervalo(pins, minutos);
+    return res.json({ ok: true, updated: pins.length });
+  } catch (err) {
+    console.error('[PATCH /usuarios/intervalo]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
 // PUT /api/admin/usuarios/:pin
 router.put('/usuarios/:pin', authMiddleware, async (req: Request, res: Response) => {
   const { pin } = req.params;

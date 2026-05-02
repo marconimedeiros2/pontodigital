@@ -788,6 +788,14 @@ code {
   color: var(--text-muted);
 }
 
+.bulk-jornada-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
 .bulk-jornada-btn {
   padding: 6px 16px;
   background: #2563eb;

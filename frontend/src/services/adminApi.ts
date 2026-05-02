@@ -99,6 +99,12 @@ export const adminApi = {
       body: JSON.stringify({ pins, horas_diarias }),
     }),
 
+  bulkUpdateIntervalo: (pins: string[], intervalo: number) =>
+    request<{ ok: boolean; updated: number }>(`${BASE}/usuarios/intervalo`, {
+      method: 'PATCH',
+      body: JSON.stringify({ pins, intervalo }),
+    }),
+
   deleteUsuario: (pin: string) =>
     request<{ ok: boolean }>(`${BASE}/usuarios/${pin}`, { method: 'DELETE' }),
 

@@ -176,6 +176,14 @@ export const db = {
     if (error) raise(error, 'bulkUpdateHorasDiarias');
   },
 
+  async bulkUpdateIntervalo(pins: string[], intervalo: number): Promise<void> {
+    const { error } = await supabase
+      .from('usuarios')
+      .update({ intervalo })
+      .in('pin', pins);
+    if (error) raise(error, 'bulkUpdateIntervalo');
+  },
+
   async updateUsuario(
     id: string,
     fields: Partial<Pick<Usuario, 'pin' | 'nome' | 'ativo' | 'horas_diarias' | 'intervalo'>>

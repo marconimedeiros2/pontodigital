@@ -485,6 +485,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [editingUsuario, setEditingUsuario] = useState<Usuario | null>(null);
   const [selectedUsuarios, setSelectedUsuarios] = useState<Set<string>>(new Set());
   const [bulkHoras, setBulkHoras] = useState('7:20');
+  const [bulkIntervalo, setBulkIntervalo] = useState('1:00');
   const [bulkLoading, setBulkLoading] = useState(false);
 
   // Relatório state
@@ -574,6 +575,19 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     try {
       await adminApi.bulkUpdateJornada([...selectedUsuarios], minutos);
       setUsuarios((prev) => prev.map((u) => selectedUsuarios.has(u.pin) ? { ...u, horas_diarias: minutos } : u));
+      setSelectedUsuarios(new Set());
+    } catch (e) { setUsuariosError(e instanceof Error ? e.message : 'Erro ao atualizar'); }
+    finally { setBulkLoading(false); }
+  };
+
+  const handleBulkIntervalo = async () => {
+    const minutos = hhmmToMinutes(bulkIntervalo);
+    if (isNaN(minutos) || minutos < 0 || minutos > 480) return;
+    if (!confirm(`Alterar intervalo de ${selectedUsuarios.size} funcionário(s) para ${minutesToHHMM(minutos)}?`)) return;
+    setBulkLoading(true);
+    try {
+      await adminApi.bulkUpdateIntervalo([...selectedUsuarios], minutos);
+      setUsuarios((prev) => prev.map((u) => selectedUsuarios.has(u.pin) ? { ...u, intervalo: minutos } : u));
       setSelectedUsuarios(new Set());
     } catch (e) { setUsuariosError(e instanceof Error ? e.message : 'Erro ao atualizar'); }
     finally { setBulkLoading(false); }
@@ -908,7 +922,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                       {selectedUsuarios.size} selecionado{selectedUsuarios.size > 1 ? 's' : ''}
                     </span>
                     <div className="bulk-jornada-controls">
-                      <label className="bulk-jornada-label">Alterar jornada para</label>
+                      <label className="bulk-jornada-label">Jornada</label>
                       <input
                         type="text" pattern="\d+:[0-5]\d" placeholder="7:20"
                         className="bulk-jornada-input"
@@ -917,6 +931,18 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                       />
                       <span className="bulk-jornada-unit">h:mm</span>
                       <button className="bulk-jornada-btn" onClick={handleBulkJornada} disabled={bulkLoading}>
+                        {bulkLoading ? <span className="spinner" /> : 'Aplicar'}
+                      </button>
+                      <span className="bulk-jornada-divider" />
+                      <label className="bulk-jornada-label">Intervalo</label>
+                      <input
+                        type="text" pattern="\d+:[0-5]\d" placeholder="1:00"
+                        className="bulk-jornada-input"
+                        value={bulkIntervalo}
+                        onChange={(e) => setBulkIntervalo(e.target.value)}
+                      />
+                      <span className="bulk-jornada-unit">h:mm</span>
+                      <button className="bulk-jornada-btn" style={{ background: '#d97706' }} onClick={handleBulkIntervalo} disabled={bulkLoading}>
                         {bulkLoading ? <span className="spinner" /> : 'Aplicar'}
                       </button>
                     </div>

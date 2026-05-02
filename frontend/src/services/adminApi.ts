@@ -30,6 +30,7 @@ export interface RegistroAdmin {
   hora_final: string | null;
   completo: boolean;
   oculto?: boolean;
+  extra?: boolean;
 }
 
 export interface DashboardStats {
@@ -110,7 +111,7 @@ export const adminApi = {
 
   updateRegistro: (
     id: number,
-    fields: Partial<Pick<RegistroAdmin, 'hora_inicial' | 'inicio_intervalo' | 'fim_intervalo' | 'hora_final'> & { oculto: boolean }>
+    fields: Partial<Pick<RegistroAdmin, 'hora_inicial' | 'inicio_intervalo' | 'fim_intervalo' | 'hora_final'> & { oculto: boolean; extra: boolean }>
   ) =>
     request<{ ok: boolean }>(`${BASE}/registros/${id}`, {
       method: 'PUT',

@@ -36,6 +36,7 @@ export function exportToXlsx(registros: RegistroAdmin[], filename: string): void
     'Fim Intervalo': r.fim_intervalo ?? '—',
     'Saída': r.hora_final ?? '—',
     'Horas Trabalhadas': calcWorkTime(r),
+    'Extra': r.extra ? 'Sim' : 'Não',
     'Status': getStatus(r),
     'Jornada Completa': r.completo ? 'Sim' : 'Não',
   }));

@@ -304,6 +304,9 @@ router.put('/registros/:id', authMiddleware, async (req: Request, res: Response)
   if ('oculto' in req.body && typeof req.body.oculto === 'boolean') {
     fields['oculto'] = req.body.oculto;
   }
+  if ('extra' in req.body && typeof req.body.extra === 'boolean') {
+    fields['extra'] = req.body.extra;
+  }
 
   if (Object.keys(fields).length === 0) {
     return res.status(400).json({ error: 'Nenhum campo válido informado.' });

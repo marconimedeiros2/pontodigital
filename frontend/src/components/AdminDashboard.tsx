@@ -667,11 +667,25 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     }));
   };
 
+  const handleExtraToggle = async (id: number, currentVal: boolean) => {
+    const nextVal = !currentVal;
+    // Otimistic update
+    setRelDataAll((prev) => prev.map((r) => r.id === id ? { ...r, extra: nextVal } : r));
+    try {
+      await adminApi.updateRegistro(id, { extra: nextVal });
+    } catch (e) {
+      alert('Erro ao atualizar Extra');
+      // Revert if error
+      setRelDataAll((prev) => prev.map((r) => r.id === id ? { ...r, extra: currentVal } : r));
+    }
+  };
+
   const exportCSV = (registros: RegistroAdmin[], prefix = 'relatorio') => {
-    const header = 'Data,Funcionário,PIN,Entrada,Início Intervalo,Fim Intervalo,Saída,Horas Trabalhadas,Status\n';
+    const header = 'Data,Funcionário,PIN,Entrada,Início Intervalo,Fim Intervalo,Saída,Horas Trabalhadas,Extra,Status\n';
     const rows = registros.map((r) =>
       [r.data, r.nome, r.pin, r.hora_inicial || '', r.inicio_intervalo || '',
        r.fim_intervalo || '', r.hora_final || '', calcWorkTime(r),
+       r.extra ? 'Sim' : 'Não',
        r.completo ? 'Completo' : 'Incompleto'].join(',')
     ).join('\n');
     const blob = new Blob(['﻿' + header + rows], { type: 'text/csv;charset=utf-8;' });
@@ -1130,7 +1144,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                           <input type="checkbox" className="rel-checkbox"
                             checked={allRelSelected} onChange={toggleAllRel} />
                         </th>
-                        <th>Data</th><th>Funcionário</th><th>Entrada</th><th>Iníc. Int.</th><th>Fim Int.</th><th>Saída</th><th>Trabalhado</th><th>Status</th><th></th>
+                        <th>Data</th><th>Funcionário</th><th>Entrada</th><th>Iníc. Int.</th><th>Fim Int.</th><th>Saída</th><th>Trabalhado</th><th>Extra</th><th>Status</th><th></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1151,6 +1165,14 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                             </td>
                           ))}
                           <td><strong>{calcWorkTime(r)}</strong></td>
+                          <td>
+                            <input 
+                              type="checkbox" 
+                              className="rel-checkbox"
+                              checked={!!r.extra} 
+                              onChange={() => handleExtraToggle(r.id, !!r.extra)} 
+                            />
+                          </td>
                           <td><StatusBadge reg={r} /></td>
                           <td>
                             {r.oculto && (

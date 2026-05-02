@@ -13,6 +13,7 @@ export interface Registro {
   horas_diarias: number | null;
   intervalo: number | null;
   oculto: boolean;
+  extra: boolean | null;
   created_at: string;
 }
 

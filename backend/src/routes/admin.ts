@@ -342,6 +342,7 @@ router.post('/registros', authMiddleware, async (req: Request, res: Response) =>
       fim_intervalo:     fim_intervalo     || null,
       hora_final:        hora_final        || null,
       horas_diarias:     usuario.horas_diarias ?? null,
+      intervalo:         usuario.intervalo ?? null,
     });
 
     return res.status(201).json({ ok: true, id: registro.id });

@@ -76,6 +76,7 @@ router.post('/registrar', async (req: Request, res: Response) => {
       updated = await db.insertRecord(usuario.id, pin, dataHoje, {
         hora_inicial: agora,
         horas_diarias: usuario.horas_diarias ?? null,
+        intervalo: usuario.intervalo ?? null,
       });
     } else {
       // Continue existing session — nextStep is always non-null here

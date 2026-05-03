@@ -534,6 +534,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [intervaloPadrao, setIntervaloPadrao] = useState('1:00');
   const [escalaMsg, setEscalaMsg] = useState('');
   const [escalaError, setEscalaError] = useState('');
+  const [configTab, setConfigTab] = useState<'escala' | 'senha'>('escala');
 
   const loadDashboard = useCallback(async () => {
     setDashLoading(true);
@@ -1228,70 +1229,89 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
           <div className="admin-section">
             <div className="admin-section-header"><h2>Configurações</h2></div>
 
-            <div className="admin-card" style={{ maxWidth: 440 }}>
-              <h3 className="admin-card-title">Escala Padrão</h3>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 16 }}>
-                Jornada padrão aplicada ao cadastrar novos funcionários. Use o formato <strong>H:MM</strong> (ex: 7:20).
-              </p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div className="input-group">
-                  <label className="input-label">Jornada padrão (H:MM)</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input
-                      type="text" pattern="\d+:[0-5]\d" placeholder="7:20"
-                      className="text-input" style={{ width: 100 }}
-                      value={escalaPadrao}
-                      onChange={(e) => { setEscalaPadrao(e.target.value); setEscalaMsg(''); setEscalaError(''); }}
-                    />
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>h:mm</span>
-                  </div>
-                </div>
-                <div className="input-group">
-                  <label className="input-label">Intervalo padrão (H:MM)</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input
-                      type="text" pattern="\d+:[0-5]\d" placeholder="1:00"
-                      className="text-input" style={{ width: 100 }}
-                      value={intervaloPadrao}
-                      onChange={(e) => { setIntervaloPadrao(e.target.value); setEscalaMsg(''); setEscalaError(''); }}
-                    />
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>h:mm</span>
-                  </div>
-                </div>
-              </div>
-              {escalaError && <p className="error-msg" style={{ marginTop: 8 }}>{escalaError}</p>}
-              {escalaMsg && <p style={{ color: 'var(--success)', marginTop: 8, fontWeight: 600 }}>{escalaMsg}</p>}
-              <button className="confirm-btn" style={{ marginTop: 16 }} onClick={handleSaveEscala}>
-                Salvar Escala
+            <div className="config-tabs" style={{ display: 'flex', gap: 16, marginBottom: 24, borderBottom: '1px solid var(--border)', paddingBottom: 0 }}>
+              <button 
+                style={{ background: 'none', border: 'none', padding: '8px 16px', cursor: 'pointer', fontWeight: 600, fontSize: '0.95rem', color: configTab === 'escala' ? 'var(--status-primary)' : 'var(--text-muted)', borderBottom: configTab === 'escala' ? '2px solid var(--status-primary)' : '2px solid transparent', transition: 'all 0.2s' }}
+                onClick={() => setConfigTab('escala')}
+              >
+                Escala
+              </button>
+              <button 
+                style={{ background: 'none', border: 'none', padding: '8px 16px', cursor: 'pointer', fontWeight: 600, fontSize: '0.95rem', color: configTab === 'senha' ? 'var(--status-primary)' : 'var(--text-muted)', borderBottom: configTab === 'senha' ? '2px solid var(--status-primary)' : '2px solid transparent', transition: 'all 0.2s' }}
+                onClick={() => setConfigTab('senha')}
+              >
+                Senha
               </button>
             </div>
 
-            <div className="admin-card" style={{ maxWidth: 440 }}>
-              <h3 className="admin-card-title">Alterar Senha do Admin</h3>
-              <div className="input-group">
-                <label className="input-label">Senha Atual</label>
-                <input type="password" value={senhaAtual}
-                  onChange={(e) => setSenhaAtual(e.target.value)}
-                  className="text-input" placeholder="Digite a senha atual" />
+            {configTab === 'escala' && (
+              <div className="admin-card" style={{ maxWidth: 440 }}>
+                <h3 className="admin-card-title">Escala Padrão</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 16 }}>
+                  Jornada padrão aplicada ao cadastrar novos funcionários. Use o formato <strong>H:MM</strong> (ex: 7:20).
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div className="input-group">
+                    <label className="input-label">Jornada padrão (H:MM)</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input
+                        type="text" pattern="\d+:[0-5]\d" placeholder="7:20"
+                        className="text-input" style={{ width: 100 }}
+                        value={escalaPadrao}
+                        onChange={(e) => { setEscalaPadrao(e.target.value); setEscalaMsg(''); setEscalaError(''); }}
+                      />
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>h:mm</span>
+                    </div>
+                  </div>
+                  <div className="input-group">
+                    <label className="input-label">Intervalo padrão (H:MM)</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input
+                        type="text" pattern="\d+:[0-5]\d" placeholder="1:00"
+                        className="text-input" style={{ width: 100 }}
+                        value={intervaloPadrao}
+                        onChange={(e) => { setIntervaloPadrao(e.target.value); setEscalaMsg(''); setEscalaError(''); }}
+                      />
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>h:mm</span>
+                    </div>
+                  </div>
+                </div>
+                {escalaError && <p className="error-msg" style={{ marginTop: 8 }}>{escalaError}</p>}
+                {escalaMsg && <p style={{ color: 'var(--success)', marginTop: 8, fontWeight: 600 }}>{escalaMsg}</p>}
+                <button className="confirm-btn" style={{ marginTop: 16 }} onClick={handleSaveEscala}>
+                  Salvar Escala
+                </button>
               </div>
-              <div className="input-group">
-                <label className="input-label">Nova Senha</label>
-                <input type="password" value={novaSenha}
-                  onChange={(e) => setNovaSenha(e.target.value)}
-                  className="text-input" placeholder="Mínimo 6 caracteres" />
+            )}
+
+            {configTab === 'senha' && (
+              <div className="admin-card" style={{ maxWidth: 440 }}>
+                <h3 className="admin-card-title">Alterar Senha do Admin</h3>
+                <div className="input-group">
+                  <label className="input-label">Senha Atual</label>
+                  <input type="password" value={senhaAtual}
+                    onChange={(e) => setSenhaAtual(e.target.value)}
+                    className="text-input" placeholder="Digite a senha atual" />
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Nova Senha</label>
+                  <input type="password" value={novaSenha}
+                    onChange={(e) => setNovaSenha(e.target.value)}
+                    className="text-input" placeholder="Mínimo 6 caracteres" />
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Confirmar Nova Senha</label>
+                  <input type="password" value={confirmarSenha}
+                    onChange={(e) => setConfirmarSenha(e.target.value)}
+                    className="text-input" placeholder="Repita a nova senha" />
+                </div>
+                {configError && <p className="error-msg" style={{ marginTop: 8 }}>{configError}</p>}
+                {configMsg && <p style={{ color: 'var(--success)', marginTop: 8, fontWeight: 600 }}>{configMsg}</p>}
+                <button className="confirm-btn" style={{ marginTop: 16 }} onClick={handleChangePassword}>
+                  Salvar Nova Senha
+                </button>
               </div>
-              <div className="input-group">
-                <label className="input-label">Confirmar Nova Senha</label>
-                <input type="password" value={confirmarSenha}
-                  onChange={(e) => setConfirmarSenha(e.target.value)}
-                  className="text-input" placeholder="Repita a nova senha" />
-              </div>
-              {configError && <p className="error-msg" style={{ marginTop: 8 }}>{configError}</p>}
-              {configMsg && <p style={{ color: 'var(--success)', marginTop: 8, fontWeight: 600 }}>{configMsg}</p>}
-              <button className="confirm-btn" style={{ marginTop: 16 }} onClick={handleChangePassword}>
-                Salvar Nova Senha
-              </button>
-            </div>
+            )}
           </div>
         )}
       </main>

@@ -190,11 +190,14 @@ function calcWorkTime(reg: RegistroAdmin): string {
     const minInic = parseTime(inicInt);
     let minFim = parseTime(fimInt);
     
-    // Trata virada de dia no intervalo
     if (minFim < minInic) {
-      minFim += 24 * 60;
+      const wrapped = minFim + 24 * 60 - minInic;
+      // intervalo > 8h = dados inconsistentes (início/fim invertidos)
+      if (wrapped > 480) return '—';
+      totalInterval = wrapped;
+    } else {
+      totalInterval = minFim - minInic;
     }
-    totalInterval = minFim - minInic;
   }
 
   const worked = (minSaida - minEntrada) - totalInterval;
@@ -683,13 +686,21 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   };
 
   const handleFieldEdit = async (id: number, field: TimeField, apiVal: string | null) => {
-    await adminApi.updateRegistro(id, { [field]: apiVal });
-    setRelDataAll((prev) => prev.map((r) => {
-      if (r.id !== id) return r;
-      const u = { ...r, [field]: apiVal };
-      u.completo = !!(u.hora_inicial && u.inicio_intervalo && u.fim_intervalo && u.hora_final);
-      return u;
-    }));
+    const original = relDataAll.find((r) => r.id === id);
+    const applyUpdate = (prev: RegistroAdmin[]) =>
+      prev.map((r) => {
+        if (r.id !== id) return r;
+        const u = { ...r, [field]: apiVal };
+        u.completo = !!(u.hora_inicial && u.inicio_intervalo && u.fim_intervalo && u.hora_final);
+        return u;
+      });
+    setRelDataAll(applyUpdate);
+    try {
+      await adminApi.updateRegistro(id, { [field]: apiVal });
+    } catch (e) {
+      if (original) setRelDataAll((prev) => prev.map((r) => (r.id !== id ? r : original)));
+      throw e;
+    }
   };
 
   const handleExtraToggle = async (id: number, currentVal: boolean) => {
@@ -765,7 +776,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
       </svg>,
     },
     {
-      id: 'relatorio', label: 'Relatório',
+      id: 'relatorio', label: 'Registros',
       icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
         <polyline points="14 2 14 8 20 8"/>
@@ -1063,7 +1074,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               />
             )}
             <div className="admin-section-header">
-              <h2>Relatório</h2>
+              <h2>Registros</h2>
               <button className="btn-novo-registro" onClick={() => setShowAddModal(true)}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>

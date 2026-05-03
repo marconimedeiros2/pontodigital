@@ -257,6 +257,8 @@ function formatLogDate(iso: string): string {
   return d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
+type LogFiltro = 'todos' | 'default' | 'custom';
+
 function LogsModal({ registroId, nomeFuncionario, onClose }: {
   registroId: number;
   nomeFuncionario: string;
@@ -265,6 +267,7 @@ function LogsModal({ registroId, nomeFuncionario, onClose }: {
   const [logs, setLogs] = useState<RegistroLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [filtro, setFiltro] = useState<LogFiltro>('todos');
 
   useEffect(() => {
     adminApi.getLogs(registroId)
@@ -272,6 +275,13 @@ function LogsModal({ registroId, nomeFuncionario, onClose }: {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [registroId]);
+
+  const filtered = filtro === 'todos' ? logs : logs.filter((l) => (l.tipo ?? 'default') === filtro);
+  const countDefault = logs.filter((l) => (l.tipo ?? 'default') === 'default').length;
+  const countCustom  = logs.filter((l) => l.tipo === 'custom').length;
+
+  const campoLabel = (log: RegistroLog) =>
+    log.tipo === 'custom' ? log.campo : (FIELD_LABELS[log.campo] ?? log.campo);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -281,18 +291,40 @@ function LogsModal({ registroId, nomeFuncionario, onClose }: {
           <span className="logs-modal__subtitle">{nomeFuncionario} — Registro #{registroId}</span>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
+
+        {!loading && logs.length > 0 && (
+          <div className="logs-filter">
+            {([
+              ['todos',   'Todos',               logs.length],
+              ['default', 'Campos padrão',        countDefault],
+              ['custom',  'Campos personalizados', countCustom],
+            ] as [LogFiltro, string, number][]).map(([val, label, cnt]) => (
+              <button
+                key={val}
+                className={`logs-filter-btn${filtro === val ? ' logs-filter-btn--active' : ''}`}
+                onClick={() => setFiltro(val)}
+              >
+                {label} <span className="logs-filter-count">{cnt}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="logs-modal__body">
           {loading && <div className="admin-empty">Carregando...</div>}
           {error && <div className="admin-empty" style={{ color: 'var(--danger)' }}>{error}</div>}
-          {!loading && !error && logs.length === 0 && (
-            <div className="admin-empty">Nenhuma alteração registrada.</div>
+          {!loading && !error && filtered.length === 0 && (
+            <div className="admin-empty">Nenhuma alteração {filtro !== 'todos' ? 'neste filtro' : 'registrada'}.</div>
           )}
-          {!loading && logs.length > 0 && (
+          {!loading && filtered.length > 0 && (
             <ul className="logs-list">
-              {logs.map((log) => (
-                <li key={log.id} className="log-entry">
+              {filtered.map((log) => (
+                <li key={log.id} className={`log-entry${log.tipo === 'custom' ? ' log-entry--custom' : ''}`}>
                   <div className="log-entry__main">
-                    <span className="log-entry__campo">{FIELD_LABELS[log.campo] ?? log.campo}</span>
+                    <span className="log-entry__campo">{campoLabel(log)}</span>
+                    {log.tipo === 'custom' && (
+                      <span className="log-entry__badge">personalizado</span>
+                    )}
                     {' alterado de '}
                     <span className="log-entry__valor log-entry__valor--old">
                       {formatLogValue(log.campo, log.valor_anterior)}
@@ -327,14 +359,18 @@ function CustomFieldInput({ field, value, onSave, rowKey }: {
   React.useEffect(() => { setLocal(value); }, [value]);
   const save = () => { if (local !== value) onSave(local); };
 
+  // Checkbox/boolean → botão ✅/❌ clicável
   if (field.input_type === 'checkbox') {
+    const checked = local === 'true';
     return (
-      <input type="checkbox" className="rel-checkbox"
-        checked={local === 'true'}
-        onChange={(e) => { const v = e.target.checked ? 'true' : 'false'; setLocal(v); onSave(v); }}
-      />
+      <button className="cf-bool-toggle" title={checked ? 'Sim — clique para alterar' : 'Não — clique para alterar'}
+        onClick={() => { const v = checked ? 'false' : 'true'; setLocal(v); onSave(v); }}>
+        {checked ? '✅' : '❌'}
+      </button>
     );
   }
+
+  // Select → dropdown mostrando labels
   if (field.input_type === 'select') {
     return (
       <select className="cf-select" value={local}
@@ -344,6 +380,8 @@ function CustomFieldInput({ field, value, onSave, rowKey }: {
       </select>
     );
   }
+
+  // Radio → botões inline
   if (field.input_type === 'radio') {
     return (
       <div className="cf-radio-group">
@@ -359,18 +397,20 @@ function CustomFieldInput({ field, value, onSave, rowKey }: {
       </div>
     );
   }
+
   if (field.input_type === 'textarea') {
     return (
-      <textarea className="cf-textarea" value={local} rows={2}
+      <textarea className="cf-textarea" value={local} rows={2} placeholder="—"
         onChange={(e) => setLocal(e.target.value)} onBlur={save} />
     );
   }
+
   const inputType = field.input_type === 'datepicker' ? 'date'
     : field.input_type === 'timepicker' ? 'time'
     : field.input_type === 'number' ? 'number'
     : 'text';
   return (
-    <input type={inputType} className="cf-input" value={local}
+    <input type={inputType} className="cf-input" value={local} placeholder="—"
       onChange={(e) => setLocal(e.target.value)} onBlur={save} />
   );
 }
@@ -1128,18 +1168,6 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     }
   };
 
-  const handleExtraToggle = async (id: number, currentVal: boolean) => {
-    const nextVal = !currentVal;
-    // Otimistic update
-    setRelDataAll((prev) => prev.map((r) => r.id === id ? { ...r, extra: nextVal } : r));
-    try {
-      await adminApi.updateRegistro(id, { extra: nextVal });
-    } catch (e) {
-      alert('Erro ao atualizar Extra');
-      // Revert if error
-      setRelDataAll((prev) => prev.map((r) => r.id === id ? { ...r, extra: currentVal } : r));
-    }
-  };
 
   const exportCSV = (registros: RegistroAdmin[], prefix = 'relatorio') => {
     const header = 'Data,Funcionário,PIN,Entrada,Início Intervalo,Fim Intervalo,Saída,Horas Trabalhadas,Extra,Status\n';
@@ -1612,9 +1640,9 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                           <input type="checkbox" className="rel-checkbox"
                             checked={allRelSelected} onChange={toggleAllRel} />
                         </th>
-                        <th>Data</th><th>Funcionário</th><th>Entrada</th><th>Iníc. Int.</th><th>Fim Int.</th><th>Saída</th><th>Trabalhado</th><th>Extra</th><th>Status</th>
+                        <th>Data</th><th>Funcionário</th><th>Entrada</th><th>Iníc. Int.</th><th>Fim Int.</th><th>Saída</th><th>Trabalhado</th>
                         {activeCustomFields.map((f) => <th key={f.id} title={f.nome}>{f.nome}</th>)}
-                        <th title="Histórico">Log</th><th></th>
+                        <th>Status</th><th title="Histórico">Log</th><th></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1635,15 +1663,6 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                             </td>
                           ))}
                           <td><strong>{calcWorkTime(r)}</strong></td>
-                          <td>
-                            <input 
-                              type="checkbox" 
-                              className="rel-checkbox"
-                              checked={!!r.extra} 
-                              onChange={() => handleExtraToggle(r.id, !!r.extra)} 
-                            />
-                          </td>
-                          <td><StatusBadge reg={r} /></td>
                           {activeCustomFields.map((f) => (
                             <td key={f.id}>
                               <CustomFieldInput
@@ -1654,6 +1673,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                               />
                             </td>
                           ))}
+                          <td><StatusBadge reg={r} /></td>
                           <td>
                             <button
                               className="btn-log-history"

@@ -828,6 +828,17 @@ code {
 .cf-textarea { resize: vertical; min-height: 40px; }
 .cf-radio-group { display: flex; flex-direction: column; gap: 4px; }
 .cf-radio-label { display: flex; align-items: center; gap: 5px; font-size: 0.8rem; cursor: pointer; }
+.cf-bool-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: background 0.15s;
+  line-height: 1;
+}
+.cf-bool-toggle:hover { background: var(--border); }
 
 /* ─── Custom Field Manager (config tab) ───────────────────── */
 .cf-manager-list {
@@ -1011,4 +1022,59 @@ code {
 .log-entry__meta {
   font-size: 0.77rem;
   color: var(--text-muted);
+}
+
+/* ─── Logs Filter ─────────────────────────────────────────── */
+.logs-filter {
+  display: flex;
+  gap: 6px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+.logs-filter-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.logs-filter-btn--active {
+  background: var(--primary-light);
+  color: var(--primary);
+  border-color: var(--primary);
+  font-weight: 600;
+}
+.logs-filter-count {
+  background: var(--border);
+  border-radius: 10px;
+  padding: 0 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.logs-filter-btn--active .logs-filter-count {
+  background: var(--primary);
+  color: #fff;
+}
+
+/* ─── Log entry badge (campo personalizado) ───────────────── */
+.log-entry--custom .log-entry__campo {
+  color: #7c3aed;
+}
+.log-entry__badge {
+  font-size: 0.68rem;
+  background: #ede9fe;
+  color: #7c3aed;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-weight: 600;
+  vertical-align: middle;
+  margin-left: 4px;
 }

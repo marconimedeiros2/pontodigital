@@ -562,7 +562,7 @@ router.get('/custom-values', authMiddleware, async (req: Request, res: Response)
   }
 });
 
-// PUT /api/admin/custom-values  (upsert)
+// PUT /api/admin/custom-values  (upsert + log)
 router.put('/custom-values', authMiddleware, async (req: Request, res: Response) => {
   const { registroId, fieldId, value } = req.body as { registroId?: unknown; fieldId?: unknown; value?: string | null };
   const rId = Number(registroId);
@@ -571,7 +571,23 @@ router.put('/custom-values', authMiddleware, async (req: Request, res: Response)
     return res.status(400).json({ error: 'registroId e fieldId são obrigatórios.' });
   }
   try {
-    await db.upsertCustomValue(rId, fId, value ?? null);
+    const [oldValue, field] = await Promise.all([
+      db.findCustomFieldValue(rId, fId),
+      db.getCustomFieldById(fId),
+    ]);
+    const newValue = value ?? null;
+    await db.upsertCustomValue(rId, fId, newValue);
+    if (String(oldValue ?? '') !== String(newValue ?? '')) {
+      await db.insertLog(
+        rId,
+        field?.nome ?? `Campo ${fId}`,
+        oldValue,
+        newValue,
+        'admin',
+        'custom',
+        fId
+      );
+    }
     return res.json({ ok: true });
   } catch (err) {
     console.error('[PUT /custom-values]', err);

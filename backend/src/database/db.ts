@@ -35,6 +35,8 @@ export interface RegistroLog {
   valor_novo: string | null;
   alterado_em: string;
   alterado_por: string;
+  tipo: 'default' | 'custom';
+  field_id: number | null;
 }
 
 export interface CustomField {
@@ -185,11 +187,21 @@ export const db = {
     campo: string,
     valorAnterior: string | null,
     valorNovo: string | null,
-    alteradoPor = 'admin'
+    alteradoPor = 'admin',
+    tipo: 'default' | 'custom' = 'default',
+    fieldId?: number
   ): Promise<void> {
     const { error } = await supabase
       .from('registro_logs')
-      .insert({ registro_id: registroId, campo, valor_anterior: valorAnterior, valor_novo: valorNovo, alterado_por: alteradoPor });
+      .insert({
+        registro_id: registroId,
+        campo,
+        valor_anterior: valorAnterior,
+        valor_novo: valorNovo,
+        alterado_por: alteradoPor,
+        tipo,
+        field_id: fieldId ?? null,
+      });
     if (error) raise(error, 'insertLog');
   },
 
@@ -327,6 +339,21 @@ export const db = {
       .update({ escala_padrao, intervalo_padrao })
       .eq('id', 1);
     if (error) raise(error, 'setEscalaConfig');
+  },
+
+  async getCustomFieldById(id: number): Promise<CustomField | undefined> {
+    const { data } = await supabase.from('custom_fields').select('*').eq('id', id).maybeSingle();
+    return (data as CustomField | null) ?? undefined;
+  },
+
+  async findCustomFieldValue(registroId: number, fieldId: number): Promise<string | null> {
+    const { data } = await supabase
+      .from('custom_field_values')
+      .select('value')
+      .eq('registro_id', registroId)
+      .eq('field_id', fieldId)
+      .maybeSingle();
+    return (data as { value: string | null } | null)?.value ?? null;
   },
 
   // ── Custom Fields ──────────────────────────────────────────────────────────

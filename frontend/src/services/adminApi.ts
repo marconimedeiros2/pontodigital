@@ -58,6 +58,8 @@ export interface RegistroLog {
   valor_novo: string | null;
   alterado_em: string;
   alterado_por: string;
+  tipo: 'default' | 'custom';
+  field_id: number | null;
 }
 
 export interface CustomField {

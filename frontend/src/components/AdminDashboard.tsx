@@ -847,10 +847,10 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               <>
                 <div className="stats-grid">
                   {[
-                    { label: 'Registros', value: dashData.stats.total, color: '#3b82f6' },
-                    { label: 'Presentes', value: dashData.stats.presentes, color: '#16a34a' },
-                    { label: 'Em Intervalo', value: dashData.stats.emIntervalo, color: '#d97706' },
-                    { label: 'Saíram', value: dashData.stats.saiu, color: '#dc2626' },
+                    { label: 'Registros', value: dashData.stats.total, color: 'var(--status-primary)' },
+                    { label: 'Presentes', value: dashData.stats.presentes, color: 'var(--status-success)' },
+                    { label: 'Em Intervalo', value: dashData.stats.emIntervalo, color: 'var(--status-warning)' },
+                    { label: 'Saíram', value: dashData.stats.saiu, color: 'var(--status-danger)' },
                   ].map((s) => (
                     <div key={s.label} className="stat-card" style={{ borderTopColor: s.color }}>
                       <span className="stat-value" style={{ color: s.color }}>{s.value}</span>

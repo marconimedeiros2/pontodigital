@@ -17,6 +17,22 @@
   --shadow-lg: 0 8px 40px rgba(0,0,0,0.14);
   --radius: 16px;
   --radius-sm: 10px;
+
+  /* Semantic Status Colors (Blue Variants) */
+  --status-primary: #2563eb;       /* Blue 600 - Registros */
+  --status-success: #0ea5e9;       /* Sky 500 - Presente */
+  --status-warning: #8b5cf6;       /* Violet 500 - Intervalo */
+  --status-danger:  #1e3a8a;       /* Blue 900 - Saída/Ausente */
+
+  --badge-primary-bg: #dbeafe;     /* Blue 100 */
+  --badge-primary-text: #1e40af;   /* Blue 800 */
+  --badge-success-bg: #e0f2fe;     /* Sky 100 */
+  --badge-success-text: #0369a1;   /* Sky 700 */
+  --badge-warning-bg: #ede9fe;     /* Violet 100 */
+  --badge-warning-text: #6d28d9;   /* Violet 700 */
+  --badge-danger-bg: #bfdbfe;      /* Blue 200 */
+  --badge-danger-text: #1e3a8a;    /* Blue 900 */
+
   --keypad-btn-bg: #f8fafc;
   --keypad-btn-hover: #e2e8f0;
   --keypad-btn-active: #cbd5e1;
@@ -37,6 +53,22 @@
   --border: #334155;
   --shadow: 0 4px 24px rgba(0,0,0,0.4);
   --shadow-lg: 0 8px 40px rgba(0,0,0,0.6);
+
+  /* Semantic Status Colors (Dark Mode) */
+  --status-primary: #60a5fa;       /* Blue 400 */
+  --status-success: #38bdf8;       /* Sky 400 */
+  --status-warning: #a78bfa;       /* Violet 400 */
+  --status-danger:  #93c5fd;       /* Blue 300 */
+
+  --badge-primary-bg: #1e3a8a;     /* Blue 900 */
+  --badge-primary-text: #bfdbfe;   /* Blue 200 */
+  --badge-success-bg: #0c4a6e;     /* Sky 900 */
+  --badge-success-text: #bae6fd;   /* Sky 200 */
+  --badge-warning-bg: #4c1d95;     /* Violet 900 */
+  --badge-warning-text: #ddd6fe;   /* Violet 200 */
+  --badge-danger-bg: #172554;      /* Blue 950 */
+  --badge-danger-text: #93c5fd;    /* Blue 300 */
+
   --keypad-btn-bg: #263350;
   --keypad-btn-hover: #334155;
   --keypad-btn-active: #475569;

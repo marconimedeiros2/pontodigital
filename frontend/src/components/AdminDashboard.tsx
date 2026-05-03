@@ -1245,7 +1245,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
             </div>
 
             {configTab === 'escala' && (
-              <div className="admin-card" style={{ maxWidth: 440 }}>
+              <div className="admin-card">
                 <h3 className="admin-card-title">Escala Padrão</h3>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 16 }}>
                   Jornada padrão aplicada ao cadastrar novos funcionários. Use o formato <strong>H:MM</strong> (ex: 7:20).
@@ -1285,7 +1285,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
             )}
 
             {configTab === 'senha' && (
-              <div className="admin-card" style={{ maxWidth: 440 }}>
+              <div className="admin-card">
                 <h3 className="admin-card-title">Alterar Senha do Admin</h3>
                 <div className="input-group">
                   <label className="input-label">Senha Atual</label>

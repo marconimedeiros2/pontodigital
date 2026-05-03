@@ -363,9 +363,13 @@ function CustomFieldInput({ field, value, onSave, rowKey }: {
   if (field.input_type === 'checkbox') {
     const checked = local === 'true';
     return (
-      <button className="cf-bool-toggle" title={checked ? 'Sim — clique para alterar' : 'Não — clique para alterar'}
+      <button className={`cf-bool-toggle${checked ? ' cf-bool-toggle--on' : ' cf-bool-toggle--off'}`}
+        title={checked ? 'Sim — clique para alterar' : 'Não — clique para alterar'}
         onClick={() => { const v = checked ? 'false' : 'true'; setLocal(v); onSave(v); }}>
-        {checked ? '✅' : '❌'}
+        {checked
+          ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        }
       </button>
     );
   }

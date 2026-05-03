@@ -313,10 +313,47 @@ router.put('/registros/:id', authMiddleware, async (req: Request, res: Response)
   }
 
   try {
+    const atual = await db.findById(id);
     await db.updateById(id, fields as Parameters<typeof db.updateById>[1]);
+
+    if (atual) {
+      const atualMap = atual as unknown as Record<string, unknown>;
+      await Promise.all(
+        Object.entries(fields)
+          .filter(([campo, novoValor]) => {
+            const anterior = atualMap[campo];
+            return String(anterior ?? '') !== String(novoValor ?? '');
+          })
+          .map(([campo, novoValor]) => {
+            const anterior = atualMap[campo];
+            return db.insertLog(
+              id,
+              campo,
+              anterior != null ? String(anterior) : null,
+              novoValor != null ? String(novoValor) : null
+            );
+          })
+      );
+    }
+
     return res.json({ ok: true });
   } catch (err) {
     console.error('[PUT /registros/:id]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// GET /api/admin/registros/:id/logs
+router.get('/registros/:id/logs', authMiddleware, async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: 'ID inválido.' });
+  }
+  try {
+    const logs = await db.getLogsByRegistroId(id);
+    return res.json({ logs });
+  } catch (err) {
+    console.error('[GET /registros/:id/logs]', err);
     return res.status(500).json({ error: 'Erro interno.' });
   }
 });

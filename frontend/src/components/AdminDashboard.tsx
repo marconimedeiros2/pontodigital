@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { adminApi, type RegistroAdmin, type DashboardStats, type Usuario } from '../services/adminApi';
+import { adminApi, type RegistroAdmin, type DashboardStats, type Usuario, type RegistroLog } from '../services/adminApi';
 import { STEP_LABELS } from '../types';
 import { exportToXlsx } from '../utils/exportXlsx';
 
@@ -233,6 +233,86 @@ function StatusBadge({ reg }: { reg: RegistroAdmin }) {
   if (reg.inicio_intervalo && !reg.fim_intervalo)        return <span className="badge badge--intervalo">Início do Intervalo</span>;
   if (reg.hora_inicial)                                  return <span className="badge badge--presente">Entrada</span>;
   return <span className="badge badge--ausente">Ausente</span>;
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  hora_inicial: 'Entrada',
+  inicio_intervalo: 'Iníc. Int.',
+  fim_intervalo: 'Fim Int.',
+  hora_final: 'Saída',
+  oculto: 'Oculto',
+  extra: 'Extra',
+};
+
+function formatLogValue(campo: string, valor: string | null): string {
+  if (valor === null || valor === '') return '—';
+  if (campo === 'oculto' || campo === 'extra') return valor === 'true' ? 'Sim' : 'Não';
+  // timestamps: "2024-01-15 08:00:00" → "08:00"
+  const timeMatch = valor.match(/(\d{2}:\d{2})(?::\d{2})?$/);
+  return timeMatch ? timeMatch[1] : valor;
+}
+
+function formatLogDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function LogsModal({ registroId, nomeFuncionario, onClose }: {
+  registroId: number;
+  nomeFuncionario: string;
+  onClose: () => void;
+}) {
+  const [logs, setLogs] = useState<RegistroLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    adminApi.getLogs(registroId)
+      .then((r) => setLogs(r.logs))
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [registroId]);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box logs-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>Histórico de alterações</h3>
+          <span className="logs-modal__subtitle">{nomeFuncionario} — Registro #{registroId}</span>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="logs-modal__body">
+          {loading && <div className="admin-empty">Carregando...</div>}
+          {error && <div className="admin-empty" style={{ color: 'var(--danger)' }}>{error}</div>}
+          {!loading && !error && logs.length === 0 && (
+            <div className="admin-empty">Nenhuma alteração registrada.</div>
+          )}
+          {!loading && logs.length > 0 && (
+            <ul className="logs-list">
+              {logs.map((log) => (
+                <li key={log.id} className="log-entry">
+                  <div className="log-entry__main">
+                    <span className="log-entry__campo">{FIELD_LABELS[log.campo] ?? log.campo}</span>
+                    {' alterado de '}
+                    <span className="log-entry__valor log-entry__valor--old">
+                      {formatLogValue(log.campo, log.valor_anterior)}
+                    </span>
+                    {' para '}
+                    <span className="log-entry__valor log-entry__valor--new">
+                      {formatLogValue(log.campo, log.valor_novo)}
+                    </span>
+                  </div>
+                  <div className="log-entry__meta">
+                    {formatLogDate(log.alterado_em)}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function SearchableSelect({ options, value, onChange, placeholder }: {
@@ -523,6 +603,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [relSelected, setRelSelected] = useState<Set<number>>(new Set());
   const [mostrarOcultos, setMostrarOcultos] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [logsModal, setLogsModal] = useState<{ id: number; nome: string } | null>(null);
 
   const ocultosCount = relDataAll.filter((r) => r.oculto).length;
   const relData = mostrarOcultos ? relDataAll : relDataAll.filter((r) => !r.oculto);
@@ -1073,6 +1154,13 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                 onSaved={() => { if (relDataAll.length > 0) handleRelatorio(); }}
               />
             )}
+            {logsModal && (
+              <LogsModal
+                registroId={logsModal.id}
+                nomeFuncionario={logsModal.nome}
+                onClose={() => setLogsModal(null)}
+              />
+            )}
             <div className="admin-section-header">
               <h2>Registros</h2>
               <button className="btn-novo-registro" onClick={() => setShowAddModal(true)}>
@@ -1180,7 +1268,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                           <input type="checkbox" className="rel-checkbox"
                             checked={allRelSelected} onChange={toggleAllRel} />
                         </th>
-                        <th>Data</th><th>Funcionário</th><th>Entrada</th><th>Iníc. Int.</th><th>Fim Int.</th><th>Saída</th><th>Trabalhado</th><th>Extra</th><th>Status</th><th></th>
+                        <th>Data</th><th>Funcionário</th><th>Entrada</th><th>Iníc. Int.</th><th>Fim Int.</th><th>Saída</th><th>Trabalhado</th><th>Extra</th><th>Status</th><th title="Histórico">Log</th><th></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1210,6 +1298,18 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                             />
                           </td>
                           <td><StatusBadge reg={r} /></td>
+                          <td>
+                            <button
+                              className="btn-log-history"
+                              title="Ver histórico de alterações"
+                              onClick={() => setLogsModal({ id: r.id, nome: r.nome })}
+                            >
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <polyline points="12 6 12 12 16 14"/>
+                              </svg>
+                            </button>
+                          </td>
                           <td>
                             {r.oculto && (
                               <button className="btn-restore" onClick={() => handleRestoreRegistro(r.id)} title="Restaurar">

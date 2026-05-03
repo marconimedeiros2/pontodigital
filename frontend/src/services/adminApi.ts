@@ -50,6 +50,16 @@ export interface Usuario {
   created_at: string;
 }
 
+export interface RegistroLog {
+  id: number;
+  registro_id: number;
+  campo: string;
+  valor_anterior: string | null;
+  valor_novo: string | null;
+  alterado_em: string;
+  alterado_por: string;
+}
+
 export const adminApi = {
   login: (senha: string) =>
     request<{ token: string }>(`${BASE}/login`, {
@@ -145,6 +155,9 @@ export const adminApi = {
       method: 'PUT',
       body: JSON.stringify({ escala_padrao, intervalo_padrao }),
     }),
+
+  getLogs: (registroId: number) =>
+    request<{ logs: RegistroLog[] }>(`${BASE}/registros/${registroId}/logs`),
 
   saveToken: (token: string) => sessionStorage.setItem('admin_token', token),
   clearToken: () => sessionStorage.removeItem('admin_token'),

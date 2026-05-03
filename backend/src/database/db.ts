@@ -27,6 +27,16 @@ export interface Usuario {
   created_at: string;
 }
 
+export interface RegistroLog {
+  id: number;
+  registro_id: number;
+  campo: string;
+  valor_anterior: string | null;
+  valor_novo: string | null;
+  alterado_em: string;
+  alterado_por: string;
+}
+
 function hashPassword(password: string): string {
   return crypto.createHash('sha256').update(password).digest('hex');
 }
@@ -137,6 +147,39 @@ export const db = {
       .limit(limit);
     if (error) raise(error, 'findAllHidden');
     return (data ?? []) as Registro[];
+  },
+
+  async findById(id: number): Promise<Registro | undefined> {
+    const { data, error } = await supabase
+      .from('registros')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) raise(error, 'findById');
+    return data ?? undefined;
+  },
+
+  async insertLog(
+    registroId: number,
+    campo: string,
+    valorAnterior: string | null,
+    valorNovo: string | null,
+    alteradoPor = 'admin'
+  ): Promise<void> {
+    const { error } = await supabase
+      .from('registro_logs')
+      .insert({ registro_id: registroId, campo, valor_anterior: valorAnterior, valor_novo: valorNovo, alterado_por: alteradoPor });
+    if (error) raise(error, 'insertLog');
+  },
+
+  async getLogsByRegistroId(registroId: number): Promise<RegistroLog[]> {
+    const { data, error } = await supabase
+      .from('registro_logs')
+      .select('*')
+      .eq('registro_id', registroId)
+      .order('alterado_em', { ascending: false });
+    if (error) raise(error, 'getLogsByRegistroId');
+    return (data ?? []) as RegistroLog[];
   },
 
   // ── Usuários ───────────────────────────────────────────────────────────────

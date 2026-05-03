@@ -37,6 +37,27 @@ export interface RegistroLog {
   alterado_por: string;
 }
 
+export interface CustomField {
+  id: number;
+  nome: string;
+  tipo: string;
+  input_type: string;
+  options: { label: string; value: string }[] | null;
+  required: boolean;
+  ordem: number;
+  ativo: boolean;
+  valor_padrao: string | null;
+  created_at: string;
+}
+
+export interface CustomFieldValue {
+  id: number;
+  registro_id: number;
+  field_id: number;
+  value: string | null;
+  updated_at: string;
+}
+
 function hashPassword(password: string): string {
   return crypto.createHash('sha256').update(password).digest('hex');
 }
@@ -306,5 +327,61 @@ export const db = {
       .update({ escala_padrao, intervalo_padrao })
       .eq('id', 1);
     if (error) raise(error, 'setEscalaConfig');
+  },
+
+  // ── Custom Fields ──────────────────────────────────────────────────────────
+
+  async listCustomFields(includeInactive = false): Promise<CustomField[]> {
+    let query = supabase.from('custom_fields').select('*').order('ordem', { ascending: true });
+    if (!includeInactive) query = query.eq('ativo', true);
+    const { data, error } = await query;
+    if (error) raise(error, 'listCustomFields');
+    return (data ?? []) as CustomField[];
+  },
+
+  async createCustomField(fields: Omit<CustomField, 'id' | 'created_at'>): Promise<CustomField> {
+    const { data, error } = await supabase
+      .from('custom_fields')
+      .insert(fields)
+      .select()
+      .single();
+    if (error) raise(error, 'createCustomField');
+    return data as CustomField;
+  },
+
+  async updateCustomField(
+    id: number,
+    fields: Partial<Omit<CustomField, 'id' | 'created_at'>>
+  ): Promise<CustomField> {
+    const { data, error } = await supabase
+      .from('custom_fields')
+      .update(fields)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) raise(error, 'updateCustomField');
+    return data as CustomField;
+  },
+
+  // ── Custom Field Values ────────────────────────────────────────────────────
+
+  async getCustomValues(registroIds: number[]): Promise<CustomFieldValue[]> {
+    if (registroIds.length === 0) return [];
+    const { data, error } = await supabase
+      .from('custom_field_values')
+      .select('*')
+      .in('registro_id', registroIds);
+    if (error) raise(error, 'getCustomValues');
+    return (data ?? []) as CustomFieldValue[];
+  },
+
+  async upsertCustomValue(registroId: number, fieldId: number, value: string | null): Promise<void> {
+    const { error } = await supabase
+      .from('custom_field_values')
+      .upsert(
+        { registro_id: registroId, field_id: fieldId, value, updated_at: new Date().toISOString() },
+        { onConflict: 'registro_id,field_id' }
+      );
+    if (error) raise(error, 'upsertCustomValue');
   },
 };

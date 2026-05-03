@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { adminApi, type RegistroAdmin, type DashboardStats, type Usuario, type RegistroLog } from '../services/adminApi';
+import { adminApi, type RegistroAdmin, type DashboardStats, type Usuario, type RegistroLog, type CustomField } from '../services/adminApi';
 import { STEP_LABELS } from '../types';
 import { exportToXlsx } from '../utils/exportXlsx';
 
@@ -315,6 +315,325 @@ function LogsModal({ registroId, nomeFuncionario, onClose }: {
   );
 }
 
+// ── Custom Field Input ────────────────────────────────────────────────────────
+
+function CustomFieldInput({ field, value, onSave, rowKey }: {
+  field: CustomField;
+  value: string;
+  onSave: (v: string) => void;
+  rowKey: number;
+}) {
+  const [local, setLocal] = React.useState(value);
+  React.useEffect(() => { setLocal(value); }, [value]);
+  const save = () => { if (local !== value) onSave(local); };
+
+  if (field.input_type === 'checkbox') {
+    return (
+      <input type="checkbox" className="rel-checkbox"
+        checked={local === 'true'}
+        onChange={(e) => { const v = e.target.checked ? 'true' : 'false'; setLocal(v); onSave(v); }}
+      />
+    );
+  }
+  if (field.input_type === 'select') {
+    return (
+      <select className="cf-select" value={local}
+        onChange={(e) => { setLocal(e.target.value); onSave(e.target.value); }}>
+        <option value="">—</option>
+        {(field.options ?? []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    );
+  }
+  if (field.input_type === 'radio') {
+    return (
+      <div className="cf-radio-group">
+        {(field.options ?? []).map((o) => (
+          <label key={o.value} className="cf-radio-label">
+            <input type="radio" name={`cf-${field.id}-${rowKey}`}
+              value={o.value} checked={local === o.value}
+              onChange={() => { setLocal(o.value); onSave(o.value); }}
+            />
+            {o.label}
+          </label>
+        ))}
+      </div>
+    );
+  }
+  if (field.input_type === 'textarea') {
+    return (
+      <textarea className="cf-textarea" value={local} rows={2}
+        onChange={(e) => setLocal(e.target.value)} onBlur={save} />
+    );
+  }
+  const inputType = field.input_type === 'datepicker' ? 'date'
+    : field.input_type === 'timepicker' ? 'time'
+    : field.input_type === 'number' ? 'number'
+    : 'text';
+  return (
+    <input type={inputType} className="cf-input" value={local}
+      onChange={(e) => setLocal(e.target.value)} onBlur={save} />
+  );
+}
+
+// ── Custom Field Form Modal ───────────────────────────────────────────────────
+
+const CF_TIPOS = [
+  { value: 'string', label: 'Texto' },
+  { value: 'number', label: 'Número' },
+  { value: 'boolean', label: 'Booleano' },
+  { value: 'date', label: 'Data' },
+  { value: 'time', label: 'Hora' },
+];
+
+const CF_INPUTS: { value: string; label: string; tipos: string[] }[] = [
+  { value: 'text',        label: 'Campo de texto',   tipos: ['string'] },
+  { value: 'textarea',    label: 'Área de texto',    tipos: ['string'] },
+  { value: 'number',      label: 'Número',           tipos: ['number'] },
+  { value: 'checkbox',    label: 'Checkbox',         tipos: ['boolean'] },
+  { value: 'select',      label: 'Dropdown',         tipos: ['string', 'number'] },
+  { value: 'radio',       label: 'Radio',            tipos: ['string', 'number'] },
+  { value: 'datepicker',  label: 'Seletor de data',  tipos: ['date'] },
+  { value: 'timepicker',  label: 'Seletor de hora',  tipos: ['time'] },
+];
+
+function CustomFieldFormModal({ field, onClose, onSaved }: {
+  field: CustomField | null;
+  onClose: () => void;
+  onSaved: (f: CustomField) => void;
+}) {
+  const [nome, setNome] = useState(field?.nome ?? '');
+  const [tipo, setTipo] = useState(field?.tipo ?? 'string');
+  const [inputType, setInputType] = useState(field?.input_type ?? 'text');
+  const [required, setRequired] = useState(field?.required ?? false);
+  const [valorPadrao, setValorPadrao] = useState(field?.valor_padrao ?? '');
+  const [options, setOptions] = useState<{ label: string; value: string }[]>(field?.options ?? []);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const availableInputs = CF_INPUTS.filter((i) => i.tipos.includes(tipo));
+  const needsOptions = inputType === 'select' || inputType === 'radio';
+
+  const handleTipoChange = (t: string) => {
+    setTipo(t);
+    const first = CF_INPUTS.find((i) => i.tipos.includes(t));
+    if (first) setInputType(first.value);
+  };
+
+  const addOption = () => setOptions((p) => [...p, { label: '', value: '' }]);
+  const removeOption = (i: number) => setOptions((p) => p.filter((_, j) => j !== i));
+  const updateOption = (i: number, key: 'label' | 'value', val: string) =>
+    setOptions((p) => p.map((o, j) => j === i ? { ...o, [key]: val } : o));
+
+  const handleSave = async () => {
+    if (!nome.trim()) { setError('Nome é obrigatório.'); return; }
+    if (needsOptions && options.filter((o) => o.label.trim()).length === 0) {
+      setError('Adicione pelo menos uma opção.'); return;
+    }
+    setLoading(true); setError('');
+    try {
+      const payload = {
+        nome: nome.trim(), tipo, input_type: inputType,
+        options: needsOptions ? options.filter((o) => o.label.trim()) : null,
+        required, valor_padrao: valorPadrao || null,
+        ordem: field?.ordem ?? 0, ativo: field?.ativo ?? true,
+      };
+      const r = field
+        ? await adminApi.updateCustomField(field.id, payload)
+        : await adminApi.createCustomField(payload);
+      onSaved(r.field);
+      onClose();
+    } catch (e) { setError(e instanceof Error ? e.message : 'Erro ao salvar'); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box cf-form-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>{field ? 'Editar Coluna' : 'Nova Coluna'}</h3>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="cf-form-body">
+          <div className="input-group">
+            <label className="input-label">Nome da coluna</label>
+            <input className="text-input" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="ex: Motivo da Falta" />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="input-group">
+              <label className="input-label">Tipo de dado</label>
+              <select className="text-input" value={tipo} onChange={(e) => handleTipoChange(e.target.value)}>
+                {CF_TIPOS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+            <div className="input-group">
+              <label className="input-label">Tipo de input</label>
+              <select className="text-input" value={inputType} onChange={(e) => setInputType(e.target.value)}>
+                {availableInputs.map((i) => <option key={i.value} value={i.value}>{i.label}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="input-group" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" id="cf-required" checked={required} onChange={(e) => setRequired(e.target.checked)} />
+            <label htmlFor="cf-required" className="input-label" style={{ margin: 0, cursor: 'pointer' }}>Campo obrigatório</label>
+          </div>
+          {!needsOptions && (
+            <div className="input-group">
+              <label className="input-label">Valor padrão (opcional)</label>
+              <input className="text-input" value={valorPadrao} onChange={(e) => setValorPadrao(e.target.value)} placeholder="Deixe vazio para sem padrão" />
+            </div>
+          )}
+          {needsOptions && (
+            <div className="input-group">
+              <label className="input-label">Opções</label>
+              <div className="cf-options-list">
+                {options.map((o, i) => (
+                  <div key={i} className="cf-option-row">
+                    <input className="text-input" placeholder="Rótulo" value={o.label}
+                      onChange={(e) => {
+                        const label = e.target.value;
+                        const autoValue = label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+                        updateOption(i, 'label', label);
+                        if (!o.value || o.value === options[i]?.label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')) {
+                          updateOption(i, 'value', autoValue);
+                        }
+                      }}
+                    />
+                    <input className="text-input" placeholder="Valor" value={o.value}
+                      onChange={(e) => updateOption(i, 'value', e.target.value)} style={{ width: 110 }} />
+                    <button className="btn-icon-danger" onClick={() => removeOption(i)} title="Remover">✕</button>
+                  </div>
+                ))}
+                <button className="btn-add-option" onClick={addOption}>+ Adicionar opção</button>
+              </div>
+            </div>
+          )}
+          {error && <p className="error-msg">{error}</p>}
+          <button className="confirm-btn" onClick={handleSave} disabled={loading}>
+            {loading ? 'Salvando…' : 'Salvar Coluna'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Custom Field Manager (aba de configurações) ───────────────────────────────
+
+function CustomFieldManager({ fields, onChange }: {
+  fields: CustomField[];
+  onChange: (updated: CustomField[]) => void;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<CustomField | null>(null);
+
+  const sorted = [...fields].sort((a, b) => a.ordem - b.ordem);
+
+  const handleSaved = (f: CustomField) => {
+    const exists = fields.find((x) => x.id === f.id);
+    onChange(exists ? fields.map((x) => x.id === f.id ? f : x) : [...fields, f]);
+  };
+
+  const handleToggleAtivo = async (f: CustomField) => {
+    try {
+      const r = await adminApi.updateCustomField(f.id, { ativo: !f.ativo });
+      onChange(fields.map((x) => x.id === f.id ? r.field : x));
+    } catch { /* ignore */ }
+  };
+
+  const handleDelete = async (f: CustomField) => {
+    if (!confirm(`Remover a coluna "${f.nome}"? Os dados já salvos serão mantidos.`)) return;
+    try {
+      await adminApi.deleteCustomField(f.id);
+      onChange(fields.filter((x) => x.id !== f.id));
+    } catch { /* ignore */ }
+  };
+
+  const move = async (f: CustomField, dir: -1 | 1) => {
+    const idx = sorted.findIndex((x) => x.id === f.id);
+    const swap = sorted[idx + dir];
+    if (!swap) return;
+    try {
+      await adminApi.reorderCustomFields([
+        { id: f.id, ordem: swap.ordem },
+        { id: swap.id, ordem: f.ordem },
+      ]);
+      onChange(fields.map((x) => {
+        if (x.id === f.id) return { ...x, ordem: swap.ordem };
+        if (x.id === swap.id) return { ...x, ordem: f.ordem };
+        return x;
+      }));
+    } catch { /* ignore */ }
+  };
+
+  const inputLabel = (it: string) => CF_INPUTS.find((i) => i.value === it)?.label ?? it;
+  const tipoLabel  = (t: string)  => CF_TIPOS.find((x) => x.value === t)?.label ?? t;
+
+  return (
+    <div className="admin-card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <h3 className="admin-card-title" style={{ margin: 0 }}>Colunas Personalizadas</h3>
+        <button className="btn-novo-registro" onClick={() => { setShowForm(true); setEditing(null); }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Nova Coluna
+        </button>
+      </div>
+
+      {sorted.length === 0 && (
+        <div className="admin-empty">Nenhuma coluna criada ainda. Clique em "Nova Coluna" para começar.</div>
+      )}
+
+      {sorted.length > 0 && (
+        <div className="cf-manager-list">
+          {sorted.map((f, idx) => (
+            <div key={f.id} className={`cf-manager-row${f.ativo ? '' : ' cf-manager-row--inactive'}`}>
+              <div className="cf-manager-reorder">
+                <button className="btn-icon" onClick={() => move(f, -1)} disabled={idx === 0} title="Mover para cima">▲</button>
+                <button className="btn-icon" onClick={() => move(f, 1)} disabled={idx === sorted.length - 1} title="Mover para baixo">▼</button>
+              </div>
+              <div className="cf-manager-info">
+                <span className="cf-manager-nome">{f.nome}</span>
+                <span className="cf-manager-meta">{tipoLabel(f.tipo)} · {inputLabel(f.input_type)}{f.required ? ' · Obrigatório' : ''}</span>
+                {f.options && f.options.length > 0 && (
+                  <span className="cf-manager-opts">{f.options.map((o) => o.label).join(', ')}</span>
+                )}
+              </div>
+              <div className="cf-manager-actions">
+                <span className={`badge ${f.ativo ? 'badge--presente' : 'badge--ausente'}`}>{f.ativo ? 'Ativo' : 'Inativo'}</span>
+                <button className="btn-icon" onClick={() => { setEditing(f); setShowForm(true); }} title="Editar">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                <button className="btn-icon" onClick={() => handleToggleAtivo(f)} title={f.ativo ? 'Desativar' : 'Ativar'}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    {f.ativo
+                      ? <><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></>
+                      : <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>
+                    }
+                  </svg>
+                </button>
+                <button className="btn-icon btn-icon--danger" onClick={() => handleDelete(f)} title="Remover">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showForm && (
+        <CustomFieldFormModal
+          field={editing}
+          onClose={() => { setShowForm(false); setEditing(null); }}
+          onSaved={handleSaved}
+        />
+      )}
+    </div>
+  );
+}
+
 function SearchableSelect({ options, value, onChange, placeholder }: {
   options: { value: string; label: string }[];
   value: string;
@@ -605,6 +924,11 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [logsModal, setLogsModal] = useState<{ id: number; nome: string } | null>(null);
 
+  // Custom fields
+  const [customFields, setCustomFields] = useState<CustomField[]>([]);
+  const [customValues, setCustomValues] = useState<Record<number, Record<number, string>>>({});
+  const activeCustomFields = customFields.filter((f) => f.ativo).sort((a, b) => a.ordem - b.ordem);
+
   const ocultosCount = relDataAll.filter((r) => r.oculto).length;
   const relData = mostrarOcultos ? relDataAll : relDataAll.filter((r) => !r.oculto);
 
@@ -618,7 +942,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [intervaloPadrao, setIntervaloPadrao] = useState('1:00');
   const [escalaMsg, setEscalaMsg] = useState('');
   const [escalaError, setEscalaError] = useState('');
-  const [configTab, setConfigTab] = useState<'escala' | 'senha'>('escala');
+  const [configTab, setConfigTab] = useState<'escala' | 'senha' | 'colunas'>('escala');
 
   const loadDashboard = useCallback(async () => {
     setDashLoading(true);
@@ -638,6 +962,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
 
   useEffect(() => { if (tab === 'dashboard') loadDashboard(); }, [tab, loadDashboard]);
   useEffect(() => { if (tab === 'usuarios') loadUsuarios(); }, [tab, loadUsuarios]);
+  useEffect(() => { adminApi.listCustomFields(true).then((r) => setCustomFields(r.fields)).catch(() => {}); }, []);
 
   useEffect(() => {
     adminApi.getEscala().then(({ escala_padrao, intervalo_padrao }) => {
@@ -730,10 +1055,29 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     setRelSelected(new Set());
     setMostrarOcultos(false);
     try {
-      // Sempre busca todos (visíveis + ocultos) — filtragem é feita no frontend
       const data = await adminApi.getRelatorio(relInicio || undefined, relFim || undefined, true);
       setRelDataAll(data.registros);
+      if (data.registros.length > 0) {
+        const ids = data.registros.map((r) => r.id);
+        const cvData = await adminApi.getCustomValues(ids);
+        const map: Record<number, Record<number, string>> = {};
+        for (const cv of cvData.values) {
+          if (!map[cv.registro_id]) map[cv.registro_id] = {};
+          map[cv.registro_id][cv.field_id] = cv.value ?? '';
+        }
+        setCustomValues(map);
+      } else {
+        setCustomValues({});
+      }
     } catch { /* ignore */ } finally { setRelLoading(false); }
+  };
+
+  const handleCustomValueSave = async (registroId: number, fieldId: number, value: string) => {
+    setCustomValues((prev) => ({
+      ...prev,
+      [registroId]: { ...(prev[registroId] ?? {}), [fieldId]: value },
+    }));
+    try { await adminApi.upsertCustomValue(registroId, fieldId, value || null); } catch { /* ignore */ }
   };
 
   const handleToggleOcultos = () => setMostrarOcultos((v) => !v);
@@ -1268,7 +1612,9 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                           <input type="checkbox" className="rel-checkbox"
                             checked={allRelSelected} onChange={toggleAllRel} />
                         </th>
-                        <th>Data</th><th>Funcionário</th><th>Entrada</th><th>Iníc. Int.</th><th>Fim Int.</th><th>Saída</th><th>Trabalhado</th><th>Extra</th><th>Status</th><th title="Histórico">Log</th><th></th>
+                        <th>Data</th><th>Funcionário</th><th>Entrada</th><th>Iníc. Int.</th><th>Fim Int.</th><th>Saída</th><th>Trabalhado</th><th>Extra</th><th>Status</th>
+                        {activeCustomFields.map((f) => <th key={f.id} title={f.nome}>{f.nome}</th>)}
+                        <th title="Histórico">Log</th><th></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1298,6 +1644,16 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                             />
                           </td>
                           <td><StatusBadge reg={r} /></td>
+                          {activeCustomFields.map((f) => (
+                            <td key={f.id}>
+                              <CustomFieldInput
+                                field={f}
+                                value={customValues[r.id]?.[f.id] ?? f.valor_padrao ?? ''}
+                                onSave={(v) => handleCustomValueSave(r.id, f.id, v)}
+                                rowKey={r.id}
+                              />
+                            </td>
+                          ))}
                           <td>
                             <button
                               className="btn-log-history"
@@ -1347,11 +1703,17 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               >
                 Escala
               </button>
-              <button 
+              <button
                 style={{ background: 'none', border: 'none', padding: '8px 16px', cursor: 'pointer', fontWeight: 600, fontSize: '0.95rem', color: configTab === 'senha' ? 'var(--status-primary)' : 'var(--text-muted)', borderBottom: configTab === 'senha' ? '2px solid var(--status-primary)' : '2px solid transparent', transition: 'all 0.2s' }}
                 onClick={() => setConfigTab('senha')}
               >
                 Senha
+              </button>
+              <button
+                style={{ background: 'none', border: 'none', padding: '8px 16px', cursor: 'pointer', fontWeight: 600, fontSize: '0.95rem', color: configTab === 'colunas' ? 'var(--status-primary)' : 'var(--text-muted)', borderBottom: configTab === 'colunas' ? '2px solid var(--status-primary)' : '2px solid transparent', transition: 'all 0.2s' }}
+                onClick={() => setConfigTab('colunas')}
+              >
+                Colunas Personalizadas
               </button>
             </div>
 
@@ -1422,6 +1784,13 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   Salvar Nova Senha
                 </button>
               </div>
+            )}
+
+            {configTab === 'colunas' && (
+              <CustomFieldManager
+                fields={customFields}
+                onChange={setCustomFields}
+              />
             )}
           </div>
         )}

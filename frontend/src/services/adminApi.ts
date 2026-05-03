@@ -60,6 +60,25 @@ export interface RegistroLog {
   alterado_por: string;
 }
 
+export interface CustomField {
+  id: number;
+  nome: string;
+  tipo: string;
+  input_type: string;
+  options: { label: string; value: string }[] | null;
+  required: boolean;
+  ordem: number;
+  ativo: boolean;
+  valor_padrao: string | null;
+  created_at: string;
+}
+
+export interface CustomFieldValue {
+  registro_id: number;
+  field_id: number;
+  value: string | null;
+}
+
 export const adminApi = {
   login: (senha: string) =>
     request<{ token: string }>(`${BASE}/login`, {
@@ -158,6 +177,43 @@ export const adminApi = {
 
   getLogs: (registroId: number) =>
     request<{ logs: RegistroLog[] }>(`${BASE}/registros/${registroId}/logs`),
+
+  // ── Custom Fields ──────────────────────────────────────────────────────────
+  listCustomFields: (all = false) =>
+    request<{ fields: CustomField[] }>(`${BASE}/custom-fields${all ? '?all=true' : ''}`),
+
+  createCustomField: (data: Omit<CustomField, 'id' | 'created_at'>) =>
+    request<{ field: CustomField }>(`${BASE}/custom-fields`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateCustomField: (id: number, data: Partial<Omit<CustomField, 'id' | 'created_at'>>) =>
+    request<{ field: CustomField }>(`${BASE}/custom-fields/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteCustomField: (id: number) =>
+    request<{ ok: boolean }>(`${BASE}/custom-fields/${id}`, { method: 'DELETE' }),
+
+  reorderCustomFields: (orders: { id: number; ordem: number }[]) =>
+    request<{ ok: boolean }>(`${BASE}/custom-fields/reorder`, {
+      method: 'PATCH',
+      body: JSON.stringify({ orders }),
+    }),
+
+  // ── Custom Field Values ────────────────────────────────────────────────────
+  getCustomValues: (registroIds: number[]) =>
+    request<{ values: CustomFieldValue[] }>(
+      `${BASE}/custom-values?registroIds=${registroIds.join(',')}`
+    ),
+
+  upsertCustomValue: (registroId: number, fieldId: number, value: string | null) =>
+    request<{ ok: boolean }>(`${BASE}/custom-values`, {
+      method: 'PUT',
+      body: JSON.stringify({ registroId, fieldId, value }),
+    }),
 
   saveToken: (token: string) => sessionStorage.setItem('admin_token', token),
   clearToken: () => sessionStorage.removeItem('admin_token'),

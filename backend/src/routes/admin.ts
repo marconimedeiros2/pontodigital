@@ -455,6 +455,130 @@ router.put('/configuracoes/escala', authMiddleware, async (req: Request, res: Re
   }
 });
 
+// ── Custom Fields ────────────────────────────────────────────────────────────
+
+// GET /api/admin/custom-fields?all=true
+router.get('/custom-fields', authMiddleware, async (req: Request, res: Response) => {
+  const includeInactive = req.query.all === 'true';
+  try {
+    const fields = await db.listCustomFields(includeInactive);
+    return res.json({ fields });
+  } catch (err) {
+    console.error('[GET /custom-fields]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// POST /api/admin/custom-fields
+router.post('/custom-fields', authMiddleware, async (req: Request, res: Response) => {
+  const { nome, tipo, input_type, options, required, ordem, ativo, valor_padrao } = req.body;
+  if (!nome || typeof nome !== 'string' || !nome.trim()) {
+    return res.status(400).json({ error: 'Nome é obrigatório.' });
+  }
+  try {
+    // Calcula próxima ordem se não informada
+    const existing = await db.listCustomFields(true);
+    const nextOrdem = typeof ordem === 'number' ? ordem : (existing.length > 0 ? Math.max(...existing.map(f => f.ordem)) + 1 : 0);
+    const field = await db.createCustomField({
+      nome: nome.trim(),
+      tipo: tipo ?? 'string',
+      input_type: input_type ?? 'text',
+      options: options ?? null,
+      required: !!required,
+      ordem: nextOrdem,
+      ativo: ativo !== false,
+      valor_padrao: valor_padrao ?? null,
+    });
+    return res.status(201).json({ field });
+  } catch (err) {
+    console.error('[POST /custom-fields]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// PATCH /api/admin/custom-fields/reorder  — antes de /:id para não conflitar
+router.patch('/custom-fields/reorder', authMiddleware, async (req: Request, res: Response) => {
+  const { orders } = req.body as { orders?: { id: number; ordem: number }[] };
+  if (!Array.isArray(orders) || orders.length === 0) {
+    return res.status(400).json({ error: 'orders é obrigatório.' });
+  }
+  try {
+    await Promise.all(orders.map(({ id, ordem }) => db.updateCustomField(id, { ordem })));
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[PATCH /custom-fields/reorder]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// PUT /api/admin/custom-fields/:id
+router.put('/custom-fields/:id', authMiddleware, async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'ID inválido.' });
+  const { nome, tipo, input_type, options, required, ordem, ativo, valor_padrao } = req.body;
+  const upd: Record<string, unknown> = {};
+  if (nome !== undefined) upd.nome = String(nome).trim();
+  if (tipo !== undefined) upd.tipo = tipo;
+  if (input_type !== undefined) upd.input_type = input_type;
+  if (options !== undefined) upd.options = options;
+  if (required !== undefined) upd.required = !!required;
+  if (ordem !== undefined) upd.ordem = Number(ordem);
+  if (ativo !== undefined) upd.ativo = !!ativo;
+  if (valor_padrao !== undefined) upd.valor_padrao = valor_padrao || null;
+  try {
+    const field = await db.updateCustomField(id, upd as Parameters<typeof db.updateCustomField>[1]);
+    return res.json({ field });
+  } catch (err) {
+    console.error('[PUT /custom-fields/:id]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// DELETE /api/admin/custom-fields/:id  (soft delete — ativo = false)
+router.delete('/custom-fields/:id', authMiddleware, async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'ID inválido.' });
+  try {
+    await db.updateCustomField(id, { ativo: false });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[DELETE /custom-fields/:id]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// ── Custom Field Values ───────────────────────────────────────────────────────
+
+// GET /api/admin/custom-values?registroIds=1,2,3
+router.get('/custom-values', authMiddleware, async (req: Request, res: Response) => {
+  const raw = (req.query.registroIds as string) ?? '';
+  const registroIds = raw.split(',').map(Number).filter(n => Number.isInteger(n) && n > 0);
+  try {
+    const values = await db.getCustomValues(registroIds);
+    return res.json({ values });
+  } catch (err) {
+    console.error('[GET /custom-values]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// PUT /api/admin/custom-values  (upsert)
+router.put('/custom-values', authMiddleware, async (req: Request, res: Response) => {
+  const { registroId, fieldId, value } = req.body as { registroId?: unknown; fieldId?: unknown; value?: string | null };
+  const rId = Number(registroId);
+  const fId = Number(fieldId);
+  if (!Number.isInteger(rId) || rId <= 0 || !Number.isInteger(fId) || fId <= 0) {
+    return res.status(400).json({ error: 'registroId e fieldId são obrigatórios.' });
+  }
+  try {
+    await db.upsertCustomValue(rId, fId, value ?? null);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[PUT /custom-values]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
 function getTodayDate(): string {
   const now = new Date();
   const y = now.getFullYear();

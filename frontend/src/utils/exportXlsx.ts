@@ -2,16 +2,45 @@ import * as XLSX from 'xlsx';
 import type { RegistroAdmin } from '../services/adminApi';
 
 function calcWorkTime(reg: RegistroAdmin): string {
-  if (!reg.hora_inicial || !reg.hora_final) return '—';
-  const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
-  const total = toMin(reg.hora_final) - toMin(reg.hora_inicial);
-  const interval =
-    reg.inicio_intervalo && reg.fim_intervalo
-      ? toMin(reg.fim_intervalo) - toMin(reg.inicio_intervalo)
-      : 0;
-  const worked = total - interval;
+  const { hora_inicial: entrada, inicio_intervalo: inicInt, fim_intervalo: fimInt, hora_final: saida } = reg;
+
+  if (!entrada || !saida) return '—';
+
+  const parseTime = (timeStr: string) => {
+    const time = timeStr.includes(' ') ? timeStr.split(' ')[1] : timeStr;
+    const [h, m] = time.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  const minEntrada = parseTime(entrada);
+  let minSaida = parseTime(saida);
+
+  // Trata virada de dia (ex: entrou 13:00 e saiu 00:10)
+  if (minSaida < minEntrada) {
+    minSaida += 24 * 60;
+  }
+
+  let totalInterval = 0;
+  if (inicInt || fimInt) {
+    // Se algum campo do intervalo estiver vazio mas o outro não, não calcula
+    if (!inicInt || !fimInt) return '—';
+    const minInic = parseTime(inicInt);
+    let minFim = parseTime(fimInt);
+    
+    // Trata virada de dia no intervalo
+    if (minFim < minInic) {
+      minFim += 24 * 60;
+    }
+    totalInterval = minFim - minInic;
+  }
+
+  const worked = (minSaida - minEntrada) - totalInterval;
+
   if (worked < 0) return '—';
-  return `${Math.floor(worked / 60)}h${String(worked % 60).padStart(2, '0')}`;
+
+  const h = Math.floor(worked / 60);
+  const m = worked % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 function formatDate(d: string): string {

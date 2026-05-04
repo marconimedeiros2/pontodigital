@@ -5,6 +5,31 @@ import { exportToXlsx } from '../utils/exportXlsx';
 
 type AdminTab = 'dashboard' | 'usuarios' | 'relatorio' | 'configuracoes';
 
+// ── Column Filter Types ────────────────────────────────────────────────────────
+type ColType = 'string' | 'time' | 'date' | 'boolean' | 'select' | 'number';
+
+interface ColSpec {
+  key: string;
+  label: string;
+  colType: ColType;
+  tipo: 'default' | 'custom';
+  fieldId?: number;
+  options?: { label: string; value: string }[];
+}
+
+interface FilterDef {
+  id: string;
+  colKey: string;
+  tipo: 'default' | 'custom';
+  fieldId?: number;
+  operador: string;
+  valor: string;
+  valor2?: string;
+  colLabel: string;
+  colType: ColType;
+  options?: { label: string; value: string }[];
+}
+
 interface AdminDashboardProps {
   onLogout: () => void;
 }
@@ -226,6 +251,279 @@ function hhmmToMinutes(str: string): number {
   return h * 60 + m;
 }
 
+// ── Column Filter Constants & Helpers ─────────────────────────────────────────
+
+const OPERATORS_BY_TYPE: Record<ColType, { value: string; label: string }[]> = {
+  string:  [{ value: 'contains', label: 'Contém' }, { value: 'equals', label: 'Igual a' }, { value: 'starts_with', label: 'Começa com' }],
+  time:    [{ value: 'equals', label: 'Igual a' }, { value: 'before', label: 'Antes de' }, { value: 'after', label: 'Depois de' }],
+  date:    [{ value: 'equals', label: 'Igual a' }, { value: 'before', label: 'Antes de' }, { value: 'after', label: 'Depois de' }, { value: 'between', label: 'Entre' }],
+  boolean: [{ value: 'true', label: 'Sim' }, { value: 'false', label: 'Não' }],
+  select:  [{ value: 'equals', label: 'Igual a' }, { value: 'not_equals', label: 'Diferente de' }],
+  number:  [{ value: 'equals', label: 'Igual a' }, { value: 'greater', label: 'Maior que' }, { value: 'less', label: 'Menor que' }, { value: 'between', label: 'Entre' }],
+};
+
+const DEFAULT_COL_SPECS: ColSpec[] = [
+  { key: 'nome',             label: 'Funcionário',  colType: 'string', tipo: 'default' },
+  { key: 'data',             label: 'Data',         colType: 'date',   tipo: 'default' },
+  { key: 'hora_inicial',     label: 'Entrada',      colType: 'time',   tipo: 'default' },
+  { key: 'inicio_intervalo', label: 'Iníc. Int.',   colType: 'time',   tipo: 'default' },
+  { key: 'fim_intervalo',    label: 'Fim Int.',      colType: 'time',   tipo: 'default' },
+  { key: 'hora_final',       label: 'Saída',        colType: 'time',   tipo: 'default' },
+  {
+    key: 'status', label: 'Status', colType: 'select', tipo: 'default',
+    options: [
+      { label: 'Entrada',             value: 'Entrada'             },
+      { label: 'Início do Intervalo', value: 'Início do Intervalo' },
+      { label: 'Fim do Intervalo',    value: 'Fim do Intervalo'    },
+      { label: 'Saída',               value: 'Saída'               },
+      { label: 'Ausente',             value: 'Ausente'             },
+    ],
+  },
+];
+
+function getStatusValue(reg: RegistroAdmin): string {
+  if (reg.hora_final)                             return 'Saída';
+  if (reg.fim_intervalo)                          return 'Fim do Intervalo';
+  if (reg.inicio_intervalo && !reg.fim_intervalo) return 'Início do Intervalo';
+  if (reg.hora_inicial)                           return 'Entrada';
+  return 'Ausente';
+}
+
+function matchesFilter(rawVal: string, f: FilterDef): boolean {
+  const val = rawVal;
+  const fv  = f.valor;
+  switch (f.operador) {
+    case 'contains':    return val.toLowerCase().includes(fv.toLowerCase());
+    case 'equals':      return val.toLowerCase() === fv.toLowerCase();
+    case 'not_equals':  return val.toLowerCase() !== fv.toLowerCase();
+    case 'starts_with': return val.toLowerCase().startsWith(fv.toLowerCase());
+    case 'before':      return val !== '' && val < fv;
+    case 'after':       return val !== '' && val > fv;
+    case 'between':     return val !== '' && val >= fv && val <= (f.valor2 ?? fv);
+    case 'greater':     return Number(val) > Number(fv);
+    case 'less':        return Number(val) < Number(fv);
+    case 'true':        return val === 'true' || val === '1';
+    case 'false':       return val === 'false' || val === '0' || val === '';
+    default:            return true;
+  }
+}
+
+function applyColFilters(
+  records: RegistroAdmin[],
+  filters: FilterDef[],
+  customVals: Record<number, Record<number, string>>
+): RegistroAdmin[] {
+  if (filters.length === 0) return records;
+  return records.filter((r) =>
+    filters.every((f) => {
+      let rawVal = '';
+      if (f.tipo === 'custom' && f.fieldId !== undefined) {
+        rawVal = customVals[r.id]?.[f.fieldId] ?? '';
+      } else {
+        switch (f.colKey) {
+          case 'nome':             rawVal = r.nome;                                                      break;
+          case 'data':             rawVal = r.data;                                                      break;
+          case 'hora_inicial':     rawVal = r.hora_inicial     ? displayTime(r.hora_inicial)     : '';  break;
+          case 'inicio_intervalo': rawVal = r.inicio_intervalo ? displayTime(r.inicio_intervalo) : '';  break;
+          case 'fim_intervalo':    rawVal = r.fim_intervalo    ? displayTime(r.fim_intervalo)    : '';  break;
+          case 'hora_final':       rawVal = r.hora_final       ? displayTime(r.hora_final)       : '';  break;
+          case 'status':           rawVal = getStatusValue(r);                                          break;
+        }
+      }
+      return matchesFilter(rawVal, f);
+    })
+  );
+}
+
+// ── FilterPanel Component ──────────────────────────────────────────────────────
+
+interface FilterPanelProps {
+  colSpecs: ColSpec[];
+  activeFilters: FilterDef[];
+  onAdd: (f: FilterDef) => void;
+  onRemove: (id: string) => void;
+  onClear: () => void;
+}
+
+function FilterPanel({ colSpecs, activeFilters, onAdd, onRemove, onClear }: FilterPanelProps) {
+  const firstSpec = colSpecs[0];
+  const [open, setOpen] = useState(false);
+  const [draftCol, setDraftCol] = useState(firstSpec?.key ?? 'nome');
+  const [draftOp, setDraftOp] = useState(
+    firstSpec ? OPERATORS_BY_TYPE[firstSpec.colType][0].value : 'contains'
+  );
+  const [draftVal, setDraftVal] = useState('');
+  const [draftVal2, setDraftVal2] = useState('');
+
+  const spec = colSpecs.find((s) => s.key === draftCol) ?? firstSpec;
+  const ops = spec ? OPERATORS_BY_TYPE[spec.colType] : [];
+  const isBool = spec?.colType === 'boolean';
+  const needBetween = draftOp === 'between';
+
+  const handleColChange = (key: string) => {
+    setDraftCol(key);
+    const s = colSpecs.find((c) => c.key === key);
+    if (s) {
+      setDraftOp(OPERATORS_BY_TYPE[s.colType][0].value);
+      setDraftVal('');
+      setDraftVal2('');
+    }
+  };
+
+  const handleAdd = () => {
+    if (!spec) return;
+    if (spec.colType !== 'boolean' && !draftVal) return;
+    onAdd({
+      id: `${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      colKey: draftCol,
+      tipo: spec.tipo,
+      fieldId: spec.fieldId,
+      operador: draftOp,
+      valor: draftVal,
+      valor2: needBetween && draftVal2 ? draftVal2 : undefined,
+      colLabel: spec.label,
+      colType: spec.colType,
+      options: spec.options,
+    });
+    setDraftVal('');
+    setDraftVal2('');
+  };
+
+  const chipText = (f: FilterDef) => {
+    if (f.colType === 'boolean') {
+      return `${f.colLabel}: ${f.operador === 'true' ? 'Sim' : 'Não'}`;
+    }
+    const opLabel = OPERATORS_BY_TYPE[f.colType].find((o) => o.value === f.operador)?.label?.toLowerCase() ?? f.operador;
+    const valLabel = f.options?.find((o) => o.value === f.valor)?.label ?? f.valor;
+    const val2Label = f.valor2 ? (f.options?.find((o) => o.value === f.valor2)?.label ?? f.valor2) : '';
+    const valStr = val2Label ? `${valLabel} – ${val2Label}` : valLabel;
+    return `${f.colLabel} ${opLabel} "${valStr}"`;
+  };
+
+  return (
+    <div className="filter-bar">
+      <div className="filter-bar__top">
+        <button
+          className={`filter-toggle-btn${activeFilters.length > 0 ? ' filter-toggle-btn--active' : ''}`}
+          onClick={() => setOpen((v) => !v)}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+          </svg>
+          Filtros
+          {activeFilters.length > 0 && (
+            <span className="filter-toggle-badge">{activeFilters.length}</span>
+          )}
+        </button>
+
+        {activeFilters.map((f) => (
+          <span key={f.id} className="filter-chip">
+            <span className="filter-chip__text">{chipText(f)}</span>
+            <button className="filter-chip__remove" onClick={() => onRemove(f.id)} title="Remover filtro">
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </span>
+        ))}
+
+        {activeFilters.length > 0 && (
+          <button className="filter-clear-btn" onClick={onClear}>Limpar todos</button>
+        )}
+      </div>
+
+      {open && (
+        <div className="filter-panel">
+          <div className="filter-panel__row">
+            {/* Column selector */}
+            <div className="filter-panel__group">
+              <label className="filter-panel__label">Coluna</label>
+              <select
+                className="filter-panel__select"
+                value={draftCol}
+                onChange={(e) => handleColChange(e.target.value)}
+              >
+                {colSpecs.map((s) => (
+                  <option key={s.key} value={s.key}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Operator selector (boolean uses operator as value) */}
+            <div className="filter-panel__group">
+              <label className="filter-panel__label">{isBool ? 'Valor' : 'Operador'}</label>
+              <select
+                className="filter-panel__select"
+                value={draftOp}
+                onChange={(e) => { setDraftOp(e.target.value); setDraftVal2(''); }}
+              >
+                {ops.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Value input (hidden for boolean since operator IS the value) */}
+            {!isBool && (
+              <div className="filter-panel__group filter-panel__group--val">
+                <label className="filter-panel__label">{needBetween ? 'De' : 'Valor'}</label>
+                {spec?.colType === 'select' && spec.options ? (
+                  <select className="filter-panel__select" value={draftVal} onChange={(e) => setDraftVal(e.target.value)}>
+                    <option value="">— selecione —</option>
+                    {spec.options.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                ) : spec?.colType === 'date' ? (
+                  <input type="date" className="filter-panel__input" value={draftVal} onChange={(e) => setDraftVal(e.target.value)} />
+                ) : spec?.colType === 'time' ? (
+                  <input type="time" className="filter-panel__input" value={draftVal} onChange={(e) => setDraftVal(e.target.value)} />
+                ) : spec?.colType === 'number' ? (
+                  <input type="number" className="filter-panel__input" value={draftVal} onChange={(e) => setDraftVal(e.target.value)} />
+                ) : (
+                  <input
+                    type="text"
+                    className="filter-panel__input"
+                    value={draftVal}
+                    onChange={(e) => setDraftVal(e.target.value)}
+                    placeholder="Valor..."
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
+                  />
+                )}
+              </div>
+            )}
+
+            {/* Between: second value */}
+            {needBetween && (
+              <div className="filter-panel__group filter-panel__group--val">
+                <label className="filter-panel__label">Até</label>
+                {spec?.colType === 'date' ? (
+                  <input type="date" className="filter-panel__input" value={draftVal2} onChange={(e) => setDraftVal2(e.target.value)} />
+                ) : spec?.colType === 'time' ? (
+                  <input type="time" className="filter-panel__input" value={draftVal2} onChange={(e) => setDraftVal2(e.target.value)} />
+                ) : (
+                  <input type="number" className="filter-panel__input" value={draftVal2} onChange={(e) => setDraftVal2(e.target.value)} />
+                )}
+              </div>
+            )}
+
+            {/* Add button */}
+            <div className="filter-panel__group filter-panel__group--btn">
+              <label className="filter-panel__label">&nbsp;</label>
+              <button
+                className="filter-panel__add"
+                onClick={handleAdd}
+                disabled={!isBool && !draftVal}
+              >
+                + Adicionar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function StatusBadge({ reg }: { reg: RegistroAdmin }) {
   if (reg.hora_final)                                    return <span className="badge badge--saiu">Saída</span>;
@@ -968,13 +1266,35 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [logsModal, setLogsModal] = useState<{ id: number; nome: string } | null>(null);
 
+  // Column filters
+  const [activeFilters, setActiveFilters] = useState<FilterDef[]>([]);
+
   // Custom fields
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [customValues, setCustomValues] = useState<Record<number, Record<number, string>>>({});
   const activeCustomFields = customFields.filter((f) => f.ativo).sort((a, b) => a.ordem - b.ordem);
 
+  // Build column spec list (standard + custom fields)
+  const allColSpecs: ColSpec[] = [
+    ...DEFAULT_COL_SPECS,
+    ...activeCustomFields.map((f): ColSpec => ({
+      key: `custom_${f.id}`,
+      label: f.nome,
+      colType: (
+        f.input_type === 'checkbox' ? 'boolean' :
+        f.input_type === 'number'   ? 'number'  :
+        (f.input_type === 'select' || f.input_type === 'radio') ? 'select' :
+        f.input_type === 'date'     ? 'date'    : 'string'
+      ) as ColType,
+      tipo: 'custom',
+      fieldId: f.id,
+      options: f.options?.map((o) => ({ label: o.label, value: o.value })) ?? undefined,
+    })),
+  ];
+
   const ocultosCount = relDataAll.filter((r) => r.oculto).length;
-  const relData = mostrarOcultos ? relDataAll : relDataAll.filter((r) => !r.oculto);
+  const relDataBase = mostrarOcultos ? relDataAll : relDataAll.filter((r) => !r.oculto);
+  const relData = applyColFilters(relDataBase, activeFilters, customValues);
 
   // Config state
   const [senhaAtual, setSenhaAtual] = useState('');
@@ -1592,11 +1912,26 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               </div>
             </div>
 
+            <FilterPanel
+              colSpecs={allColSpecs}
+              activeFilters={activeFilters}
+              onAdd={(f) => setActiveFilters((prev) => [...prev, f])}
+              onRemove={(id) => setActiveFilters((prev) => prev.filter((f) => f.id !== id))}
+              onClear={() => setActiveFilters([])}
+            />
+
             {relData.length > 0 && (
               <>
                 <div className="admin-table-actions">
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                    <span className="history-count">{relData.length} registros</span>
+                    <span className="history-count">
+                      {relData.length} registro{relData.length !== 1 ? 's' : ''}
+                      {activeFilters.length > 0 && relData.length !== relDataBase.length && (
+                        <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: 4 }}>
+                          (de {relDataBase.length})
+                        </span>
+                      )}
+                    </span>
                     {ocultosCount > 0 && (
                       <button className="btn-toggle-ocultos" onClick={handleToggleOcultos}>
                         {mostrarOcultos ? (
@@ -1709,7 +2044,18 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               </>
             )}
 
-            {!relLoading && relData.length === 0 && relInicio && (
+            {!relLoading && relData.length === 0 && relDataBase.length > 0 && activeFilters.length > 0 && (
+              <div className="admin-empty">
+                Nenhum registro corresponde aos filtros ativos.{' '}
+                <button
+                  style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: 600, padding: 0, fontSize: 'inherit' }}
+                  onClick={() => setActiveFilters([])}
+                >
+                  Limpar filtros
+                </button>
+              </div>
+            )}
+            {!relLoading && relData.length === 0 && relDataBase.length === 0 && relInicio && (
               <div className="admin-empty">Nenhum registro no período selecionado.</div>
             )}
           </div>

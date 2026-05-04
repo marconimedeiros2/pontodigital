@@ -1286,3 +1286,289 @@ code {
 }
 .filter-panel__add:hover:not(:disabled) { opacity: 0.88; }
 .filter-panel__add:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ─── Integrations Tab ────────────────────────────────────────── */
+.integrations-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.integ-section {
+  position: relative;
+}
+
+.integ-section-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.integ-section-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.integ-section-icon--uuid {
+  background: rgba(96, 165, 250, 0.12);
+  color: #60a5fa;
+}
+.integ-section-icon--key {
+  background: rgba(251, 191, 36, 0.12);
+  color: #d97706;
+}
+[data-theme='dark'] .integ-section-icon--uuid { background: rgba(96,165,250,0.15); color: #93c5fd; }
+[data-theme='dark'] .integ-section-icon--key  { background: rgba(251,191,36,0.15); color: #fbbf24; }
+
+.integ-section-desc {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* UUID row */
+.integ-uuid-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  flex-wrap: wrap;
+}
+
+.integ-uuid {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.88rem;
+  color: var(--text);
+  letter-spacing: 0.03em;
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
+}
+
+/* Copy button */
+.integ-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.integ-copy-btn:hover { border-color: var(--primary); color: var(--primary); }
+.integ-copy-btn--done {
+  background: #f0fdf4;
+  border-color: #86efac;
+  color: #15803d;
+}
+[data-theme='dark'] .integ-copy-btn--done {
+  background: rgba(34,197,94,0.1);
+  border-color: rgba(34,197,94,0.3);
+  color: #4ade80;
+}
+
+/* Create key form */
+.integ-create-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+/* Keys list */
+.integ-keys-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.integ-key-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--surface, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  transition: border-color 0.15s;
+}
+.integ-key-row:hover { border-color: color-mix(in srgb, var(--primary) 30%, var(--border)); }
+.integ-key-row--revoked {
+  opacity: 0.6;
+}
+.integ-key-row--revoked:hover { border-color: var(--border); }
+
+.integ-key-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.integ-key-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.integ-key-nome {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.integ-key-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.integ-key-badge--active  { background: #dcfce7; color: #15803d; }
+.integ-key-badge--revoked { background: #fee2e2; color: #b91c1c; }
+[data-theme='dark'] .integ-key-badge--active  { background: rgba(34,197,94,0.12); color: #4ade80; }
+[data-theme='dark'] .integ-key-badge--revoked { background: rgba(239,68,68,0.12); color: #fca5a5; }
+
+.integ-key-prefix {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.integ-key-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+.integ-key-meta--unused { color: var(--text-muted); font-style: italic; }
+
+/* Revoke button */
+.integ-revoke-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: transparent;
+  border: 1px solid #fca5a5;
+  border-radius: 7px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #b91c1c;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.integ-revoke-btn:hover { background: #fee2e2; }
+.integ-revoke-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+[data-theme='dark'] .integ-revoke-btn { border-color: rgba(239,68,68,0.4); color: #fca5a5; }
+[data-theme='dark'] .integ-revoke-btn:hover { background: rgba(239,68,68,0.12); }
+
+/* Revoked section (details/summary) */
+.integ-revoked-section {
+  margin-top: 4px;
+}
+.integ-revoked-summary {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px 4px;
+  user-select: none;
+  font-weight: 600;
+  list-style: none;
+}
+.integ-revoked-summary::-webkit-details-marker { display: none; }
+.integ-revoked-summary::before { content: '▸ '; }
+details[open] .integ-revoked-summary::before { content: '▾ '; }
+
+/* New Key Modal */
+.integ-newkey-modal {
+  max-width: 520px;
+  width: 100%;
+}
+
+.integ-newkey-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(251, 191, 36, 0.15);
+  color: #d97706;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+[data-theme='dark'] .integ-newkey-icon { background: rgba(251,191,36,0.15); color: #fbbf24; }
+
+.integ-newkey-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #92400e;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+[data-theme='dark'] .integ-newkey-warn {
+  background: rgba(251,191,36,0.08);
+  border-color: rgba(251,191,36,0.25);
+  color: #fcd34d;
+}
+.integ-newkey-warn svg { flex-shrink: 0; margin-top: 1px; color: #d97706; }
+
+.integ-fullkey-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  flex-wrap: wrap;
+}
+
+.integ-fullkey {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.82rem;
+  color: var(--text);
+  letter-spacing: 0.03em;
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
+  line-height: 1.6;
+}
+
+.integ-newkey-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 14px;
+  font-size: 0.83rem;
+  color: var(--text-muted);
+}

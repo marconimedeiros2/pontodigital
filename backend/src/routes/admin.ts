@@ -603,4 +603,58 @@ function getTodayDate(): string {
   return `${y}-${m}-${d}`;
 }
 
+// ── Integrations ───────────────────────────────────────────────────────────────
+
+function generateApiKey(): { full: string; prefix: string; hash: string } {
+  // Format: pd_live_<64 hex chars>  →  total 72 chars
+  const raw = crypto.randomBytes(32).toString('hex');
+  const full = `pd_live_${raw}`;
+  const prefix = full.slice(0, 16); // "pd_live_" + first 8 hex chars (public identifier)
+  const hash = crypto.createHash('sha256').update(full).digest('hex');
+  return { full, prefix, hash };
+}
+
+// GET /api/admin/integrations/info
+router.get('/integrations/info', authMiddleware, async (_req: Request, res: Response) => {
+  try {
+    const [uuid, keys] = await Promise.all([db.getClientUuid(), db.listApiKeys()]);
+    return res.json({ uuid, keys });
+  } catch (err) {
+    console.error('[GET /integrations/info]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// POST /api/admin/integrations/keys
+router.post('/integrations/keys', authMiddleware, async (req: Request, res: Response) => {
+  const { nome } = req.body as { nome?: string };
+  if (!nome?.trim()) {
+    return res.status(400).json({ error: 'Nome é obrigatório.' });
+  }
+  try {
+    const { full, prefix, hash } = generateApiKey();
+    const key = await db.createApiKey(nome.trim(), prefix, hash);
+    // fullKey is shown to the user ONCE and never stored in plain text
+    return res.status(201).json({ key, fullKey: full });
+  } catch (err) {
+    console.error('[POST /integrations/keys]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// DELETE /api/admin/integrations/keys/:id
+router.delete('/integrations/keys/:id', authMiddleware, async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: 'ID inválido.' });
+  }
+  try {
+    await db.revokeApiKey(id);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[DELETE /integrations/keys/:id]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
 export default router;

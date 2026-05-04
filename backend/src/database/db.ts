@@ -60,6 +60,17 @@ export interface CustomFieldValue {
   updated_at: string;
 }
 
+export interface ApiKey {
+  id: number;
+  nome: string;
+  key_prefix: string;
+  key_hash: string;
+  ativo: boolean;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+}
+
 function hashPassword(password: string): string {
   return crypto.createHash('sha256').update(password).digest('hex');
 }
@@ -410,5 +421,64 @@ export const db = {
         { onConflict: 'registro_id,field_id' }
       );
     if (error) raise(error, 'upsertCustomValue');
+  },
+
+  // ── Integrations / API Keys ────────────────────────────────────────────────
+
+  async getClientUuid(): Promise<string> {
+    const { data, error } = await supabase
+      .from('admin_config')
+      .select('client_uuid')
+      .eq('id', 1)
+      .single();
+    if (error) raise(error, 'getClientUuid');
+    return (data as { client_uuid: string }).client_uuid;
+  },
+
+  async listApiKeys(): Promise<ApiKey[]> {
+    const { data, error } = await supabase
+      .from('api_keys')
+      .select('id, nome, key_prefix, ativo, created_at, last_used_at, revoked_at')
+      .order('created_at', { ascending: false });
+    if (error) raise(error, 'listApiKeys');
+    return (data ?? []) as ApiKey[];
+  },
+
+  async createApiKey(nome: string, keyPrefix: string, keyHash: string): Promise<ApiKey> {
+    const { data, error } = await supabase
+      .from('api_keys')
+      .insert({ nome, key_prefix: keyPrefix, key_hash: keyHash })
+      .select('id, nome, key_prefix, ativo, created_at, last_used_at, revoked_at')
+      .single();
+    if (error) raise(error, 'createApiKey');
+    return data as ApiKey;
+  },
+
+  async revokeApiKey(id: number): Promise<void> {
+    const { error } = await supabase
+      .from('api_keys')
+      .update({ ativo: false, revoked_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) raise(error, 'revokeApiKey');
+  },
+
+  async validateApiKey(key: string): Promise<ApiKey | null> {
+    const hash = crypto.createHash('sha256').update(key).digest('hex');
+    const { data } = await supabase
+      .from('api_keys')
+      .select('*')
+      .eq('key_hash', hash)
+      .eq('ativo', true)
+      .is('revoked_at', null)
+      .maybeSingle();
+    if (data) {
+      // Fire-and-forget: update last_used_at
+      supabase
+        .from('api_keys')
+        .update({ last_used_at: new Date().toISOString() })
+        .eq('id', (data as ApiKey).id)
+        .then(() => {});
+    }
+    return (data as ApiKey | null);
   },
 };

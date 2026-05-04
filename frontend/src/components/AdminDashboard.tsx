@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { adminApi, type RegistroAdmin, type DashboardStats, type Usuario, type RegistroLog, type CustomField } from '../services/adminApi';
+import { adminApi, type RegistroAdmin, type DashboardStats, type Usuario, type RegistroLog, type CustomField, type ApiKey } from '../services/adminApi';
 import { STEP_LABELS } from '../types';
 import { exportToXlsx } from '../utils/exportXlsx';
 
@@ -1231,6 +1231,285 @@ function TimeCell({ value, onSave }: { value: string | null; onSave: (v: string 
   );
 }
 
+// ── IntegrationsTab ────────────────────────────────────────────────────────────
+
+function CopyButton({ text, label = 'Copiar' }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  const handle = () => {
+    navigator.clipboard.writeText(text).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  };
+  return (
+    <button className={`integ-copy-btn${copied ? ' integ-copy-btn--done' : ''}`} onClick={handle}>
+      {copied ? (
+        <>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          Copiado!
+        </>
+      ) : (
+        <>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+          {label}
+        </>
+      )}
+    </button>
+  );
+}
+
+function maskKey(prefix: string): string {
+  return `${prefix}${'•'.repeat(14)}`;
+}
+
+function fmtDateTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function IntegrationsTab() {
+  const [uuid, setUuid] = useState('');
+  const [keys, setKeys] = useState<ApiKey[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [newName, setNewName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [newKeyModal, setNewKeyModal] = useState<{ key: ApiKey; fullKey: string } | null>(null);
+  const [revoking, setRevoking] = useState<number | null>(null);
+
+  useEffect(() => {
+    adminApi.getIntegrations()
+      .then(({ uuid, keys }) => { setUuid(uuid); setKeys(keys); })
+      .catch(() => setLoadError('Erro ao carregar integrações.'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleCreate = async () => {
+    if (!newName.trim()) return;
+    setCreateError('');
+    setCreating(true);
+    try {
+      const result = await adminApi.createApiKey(newName.trim());
+      setKeys((prev) => [result.key, ...prev]);
+      setNewName('');
+      setNewKeyModal(result);
+    } catch (e) {
+      setCreateError(e instanceof Error ? e.message : 'Erro ao gerar chave.');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleRevoke = async (id: number) => {
+    if (!confirm('Revogar esta API Key? A ação não pode ser desfeita.')) return;
+    setRevoking(id);
+    try {
+      await adminApi.revokeApiKey(id);
+      setKeys((prev) =>
+        prev.map((k) => k.id === id ? { ...k, ativo: false, revoked_at: new Date().toISOString() } : k)
+      );
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Erro ao revogar.');
+    } finally {
+      setRevoking(null);
+    }
+  };
+
+  if (loading) return <div className="admin-loading"><span className="spinner spinner--large" /></div>;
+  if (loadError) return <div className="admin-empty" style={{ color: 'var(--danger, #e11d48)' }}>{loadError}</div>;
+
+  const activeKeys = keys.filter((k) => k.ativo);
+  const revokedKeys = keys.filter((k) => !k.ativo);
+
+  return (
+    <div className="integrations-tab">
+
+      {/* ── Client UUID ── */}
+      <div className="admin-card integ-section">
+        <div className="integ-section-header">
+          <div className="integ-section-icon integ-section-icon--uuid">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </div>
+          <div>
+            <h3 className="admin-card-title" style={{ marginBottom: 2 }}>Identificador do Cliente</h3>
+            <p className="integ-section-desc">UUID único desta instalação. Use para identificar seu sistema em integrações.</p>
+          </div>
+        </div>
+        <div className="integ-uuid-row">
+          <code className="integ-uuid">{uuid}</code>
+          <CopyButton text={uuid} />
+        </div>
+      </div>
+
+      {/* ── API Keys ── */}
+      <div className="admin-card integ-section" style={{ marginTop: 20 }}>
+        <div className="integ-section-header">
+          <div className="integ-section-icon integ-section-icon--key">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+            </svg>
+          </div>
+          <div>
+            <h3 className="admin-card-title" style={{ marginBottom: 2 }}>API Keys</h3>
+            <p className="integ-section-desc">Tokens de acesso para integrar sistemas externos. A chave completa é exibida <strong>apenas no momento da criação</strong>.</p>
+          </div>
+        </div>
+
+        {/* Create form */}
+        <div className="integ-create-row">
+          <input
+            type="text"
+            className="text-input"
+            placeholder='Nome da integração (ex: "Zapier", "n8n", "Webhook site")'
+            value={newName}
+            onChange={(e) => { setNewName(e.target.value); setCreateError(''); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
+            style={{ flex: 1 }}
+          />
+          <button
+            className="confirm-btn"
+            onClick={handleCreate}
+            disabled={creating || !newName.trim()}
+            style={{ whiteSpace: 'nowrap', minWidth: 140 }}
+          >
+            {creating ? <span className="spinner" /> : (
+              <>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6 }}>
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Gerar chave
+              </>
+            )}
+          </button>
+        </div>
+        {createError && <p className="error-msg" style={{ marginTop: 6 }}>{createError}</p>}
+
+        {/* Active keys */}
+        {activeKeys.length === 0 && revokedKeys.length === 0 ? (
+          <div className="admin-empty" style={{ marginTop: 16 }}>
+            Nenhuma API Key criada. Gere sua primeira chave acima.
+          </div>
+        ) : (
+          <div className="integ-keys-list">
+            {activeKeys.map((k) => (
+              <div key={k.id} className="integ-key-row">
+                <div className="integ-key-main">
+                  <div className="integ-key-top">
+                    <span className="integ-key-nome">{k.nome}</span>
+                    <span className="integ-key-badge integ-key-badge--active">Ativa</span>
+                  </div>
+                  <code className="integ-key-prefix">{maskKey(k.key_prefix)}</code>
+                  <div className="integ-key-meta">
+                    <span>Criada em {fmtDateTime(k.created_at)}</span>
+                    {k.last_used_at && (
+                      <span>· Último uso {fmtDateTime(k.last_used_at)}</span>
+                    )}
+                    {!k.last_used_at && (
+                      <span className="integ-key-meta--unused">· Nunca usada</span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  className="integ-revoke-btn"
+                  onClick={() => handleRevoke(k.id)}
+                  disabled={revoking === k.id}
+                  title="Revogar esta chave"
+                >
+                  {revoking === k.id ? <span className="spinner" /> : (
+                    <>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                      </svg>
+                      Revogar
+                    </>
+                  )}
+                </button>
+              </div>
+            ))}
+
+            {/* Revoked keys (collapsed section) */}
+            {revokedKeys.length > 0 && (
+              <details className="integ-revoked-section">
+                <summary className="integ-revoked-summary">
+                  {revokedKeys.length} chave{revokedKeys.length > 1 ? 's' : ''} revogada{revokedKeys.length > 1 ? 's' : ''}
+                </summary>
+                {revokedKeys.map((k) => (
+                  <div key={k.id} className="integ-key-row integ-key-row--revoked">
+                    <div className="integ-key-main">
+                      <div className="integ-key-top">
+                        <span className="integ-key-nome">{k.nome}</span>
+                        <span className="integ-key-badge integ-key-badge--revoked">Revogada</span>
+                      </div>
+                      <code className="integ-key-prefix">{maskKey(k.key_prefix)}</code>
+                      <div className="integ-key-meta">
+                        <span>Criada {fmtDateTime(k.created_at)}</span>
+                        {k.revoked_at && <span>· Revogada {fmtDateTime(k.revoked_at)}</span>}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </details>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── New Key Modal ── */}
+      {newKeyModal && (
+        <div className="modal-overlay" onClick={() => setNewKeyModal(null)}>
+          <div className="modal-box integ-newkey-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div className="integ-newkey-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+                  </svg>
+                </div>
+                <h3>Nova API Key gerada</h3>
+              </div>
+              <button className="modal-close" onClick={() => setNewKeyModal(null)}>×</button>
+            </div>
+
+            <div className="integ-newkey-warn">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              Copie esta chave agora. Por segurança, ela <strong>não será exibida novamente</strong>.
+            </div>
+
+            <div className="integ-fullkey-box">
+              <code className="integ-fullkey">{newKeyModal.fullKey}</code>
+              <CopyButton text={newKeyModal.fullKey} label="Copiar chave" />
+            </div>
+
+            <div className="integ-newkey-info">
+              <span><strong>Nome:</strong> {newKeyModal.key.nome}</span>
+              <span><strong>Criada em:</strong> {fmtDateTime(newKeyModal.key.created_at)}</span>
+            </div>
+
+            <button
+              className="confirm-btn"
+              style={{ marginTop: 16, width: '100%', background: 'var(--keypad-btn-bg)', color: 'var(--text)', boxShadow: 'none', border: '1px solid var(--border)' }}
+              onClick={() => setNewKeyModal(null)}
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [tab, setTab] = useState<AdminTab>('dashboard');
 
@@ -1306,7 +1585,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [intervaloPadrao, setIntervaloPadrao] = useState('1:00');
   const [escalaMsg, setEscalaMsg] = useState('');
   const [escalaError, setEscalaError] = useState('');
-  const [configTab, setConfigTab] = useState<'escala' | 'senha' | 'colunas'>('escala');
+  const [configTab, setConfigTab] = useState<'escala' | 'senha' | 'colunas' | 'integracoes'>('escala');
 
   const loadDashboard = useCallback(async () => {
     setDashLoading(true);
@@ -2085,6 +2364,12 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               >
                 Colunas Personalizadas
               </button>
+              <button
+                style={{ background: 'none', border: 'none', padding: '8px 16px', cursor: 'pointer', fontWeight: 600, fontSize: '0.95rem', color: configTab === 'integracoes' ? 'var(--status-primary)' : 'var(--text-muted)', borderBottom: configTab === 'integracoes' ? '2px solid var(--status-primary)' : '2px solid transparent', transition: 'all 0.2s' }}
+                onClick={() => setConfigTab('integracoes')}
+              >
+                Integrações
+              </button>
             </div>
 
             {configTab === 'escala' && (
@@ -2162,6 +2447,8 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                 onChange={setCustomFields}
               />
             )}
+
+            {configTab === 'integracoes' && <IntegrationsTab />}
           </div>
         )}
       </main>

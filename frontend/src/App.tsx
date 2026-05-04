@@ -7,15 +7,21 @@ import { SuccessModal } from './components/SuccessModal';
 import { HistoryView } from './components/HistoryView';
 import { AdminDashboard } from './components/AdminDashboard';
 import { PinStatusDrawer } from './components/PinStatusDrawer';
+import { ContadorLogin } from './components/ContadorLogin';
+import { ContadorDashboard } from './components/ContadorDashboard';
 import { api } from './services/api';
 import { adminApi } from './services/adminApi';
+import { contadorApi } from './services/contadorApi';
 import type { View, TipoRegistro, Registro, RegistroResponse, HojeResponse } from './types';
 import { STEP_LABELS } from './types';
 
 export default function App() {
-  const [view, setView] = useState<View>(() =>
-    adminApi.hasToken() ? 'admin' : 'home'
-  );
+  const [view, setView] = useState<View>(() => {
+    if (adminApi.hasToken()) return 'admin';
+    if (contadorApi.hasToken()) return 'contador';
+    return 'home';
+  });
+  const [contadorNome, setContadorNome] = useState(() => contadorApi.getNome());
   const [pin, setPin] = useState('');
   const [shake, setShake] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -135,6 +141,23 @@ export default function App() {
     );
   }
 
+  if (view === 'contador') {
+    if (!contadorApi.hasToken()) {
+      return (
+        <ContadorLogin
+          onLogin={(nome) => { setContadorNome(nome); setView('contador'); }}
+          onBack={() => setView('home')}
+        />
+      );
+    }
+    return (
+      <ContadorDashboard
+        nome={contadorNome}
+        onLogout={() => { contadorApi.clearSession(); setView('home'); }}
+      />
+    );
+  }
+
   if (view === 'history') {
     return (
       <div className="app">
@@ -166,6 +189,16 @@ export default function App() {
           <span>Ponto Digital</span>
         </div>
         <div className="header-actions">
+          <button
+            className="icon-btn"
+            onClick={() => setView('contador')}
+            title="Área do Contador"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </button>
           <button
             className="icon-btn"
             onClick={() => setDarkMode((d) => !d)}

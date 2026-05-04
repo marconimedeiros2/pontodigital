@@ -1,6 +1,6 @@
 export type TipoRegistro = 'hora_inicial' | 'inicio_intervalo' | 'fim_intervalo' | 'hora_final';
 
-export type View = 'home' | 'history' | 'admin';
+export type View = 'home' | 'history' | 'admin' | 'contador';
 
 export interface Registro {
   id: number;

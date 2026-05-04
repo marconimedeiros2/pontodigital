@@ -60,6 +60,27 @@ export interface CustomFieldValue {
   updated_at: string;
 }
 
+export interface Contador {
+  id: number;
+  email: string;
+  nome: string;
+  password_hash: string;
+  ativo: boolean;
+  created_at: string;
+  last_login_at: string | null;
+}
+
+export interface ContadorCliente {
+  id: number;
+  contador_id: number;
+  nome_conexao: string;
+  connection_type: 'uuid' | 'api_key';
+  client_uuid: string;
+  api_key_id: number | null;
+  created_at: string;
+  last_accessed_at: string | null;
+}
+
 export interface ApiKey {
   id: number;
   nome: string;
@@ -460,6 +481,112 @@ export const db = {
       .update({ ativo: false, revoked_at: new Date().toISOString() })
       .eq('id', id);
     if (error) raise(error, 'revokeApiKey');
+  },
+
+  // ── Contador ───────────────────────────────────────────────────────────────
+
+  async findContador(email: string): Promise<Contador | undefined> {
+    const { data, error } = await supabase
+      .from('contadores')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle();
+    if (error) raise(error, 'findContador');
+    return data ?? undefined;
+  },
+
+  async findContadorById(id: number): Promise<Contador | undefined> {
+    const { data, error } = await supabase
+      .from('contadores')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) raise(error, 'findContadorById');
+    return data ?? undefined;
+  },
+
+  async updateContadorLogin(id: number): Promise<void> {
+    await supabase
+      .from('contadores')
+      .update({ last_login_at: new Date().toISOString() })
+      .eq('id', id);
+  },
+
+  async logContadorAccess(
+    contadorId: number,
+    email: string,
+    clientUuid: string | null,
+    action: string
+  ): Promise<void> {
+    await supabase.from('contador_access_logs').insert({
+      contador_id: contadorId,
+      contador_email: email,
+      client_uuid: clientUuid,
+      action,
+    });
+  },
+
+  async upsertContadorCliente(
+    contadorId: number,
+    clientUuid: string,
+    connectionType: 'uuid' | 'api_key',
+    apiKeyId: number | null,
+    nomeConexao: string
+  ): Promise<ContadorCliente> {
+    const { data, error } = await supabase
+      .from('contador_clientes')
+      .upsert(
+        {
+          contador_id: contadorId,
+          client_uuid: clientUuid,
+          connection_type: connectionType,
+          api_key_id: apiKeyId,
+          nome_conexao: nomeConexao,
+          last_accessed_at: new Date().toISOString(),
+        },
+        { onConflict: 'contador_id,client_uuid' }
+      )
+      .select()
+      .single();
+    if (error) raise(error, 'upsertContadorCliente');
+    return data as ContadorCliente;
+  },
+
+  async listContadorClientes(contadorId: number): Promise<ContadorCliente[]> {
+    const { data, error } = await supabase
+      .from('contador_clientes')
+      .select('*')
+      .eq('contador_id', contadorId)
+      .order('last_accessed_at', { ascending: false, nullsFirst: false });
+    if (error) raise(error, 'listContadorClientes');
+    return (data ?? []) as ContadorCliente[];
+  },
+
+  async getContadorCliente(contadorId: number, id: number): Promise<ContadorCliente | undefined> {
+    const { data, error } = await supabase
+      .from('contador_clientes')
+      .select('*')
+      .eq('id', id)
+      .eq('contador_id', contadorId)
+      .maybeSingle();
+    if (error) raise(error, 'getContadorCliente');
+    return data ?? undefined;
+  },
+
+  async deleteContadorCliente(contadorId: number, id: number): Promise<void> {
+    const { error } = await supabase
+      .from('contador_clientes')
+      .delete()
+      .eq('id', id)
+      .eq('contador_id', contadorId);
+    if (error) raise(error, 'deleteContadorCliente');
+  },
+
+  async updateContadorClienteAccess(id: number): Promise<void> {
+    await supabase
+      .from('contador_clientes')
+      .update({ last_accessed_at: new Date().toISOString() })
+      .eq('id', id);
   },
 
   async validateApiKey(key: string): Promise<ApiKey | null> {

@@ -15,7 +15,14 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
     ...options,
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Erro na requisição');
+  if (!res.ok) {
+    // Session expired / invalid token → force re-login
+    if (res.status === 401) {
+      sessionStorage.removeItem('admin_token');
+      window.location.reload();
+    }
+    throw new Error(data.error || 'Erro na requisição');
+  }
   return data as T;
 }
 
@@ -79,6 +86,16 @@ export interface CustomFieldValue {
   registro_id: number;
   field_id: number;
   value: string | null;
+}
+
+export interface ApiKey {
+  id: number;
+  nome: string;
+  key_prefix: string;
+  ativo: boolean;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
 }
 
 export const adminApi = {
@@ -216,6 +233,19 @@ export const adminApi = {
       method: 'PUT',
       body: JSON.stringify({ registroId, fieldId, value }),
     }),
+
+  // ── Integrations ────────────────────────────────────────────────────────────
+  getIntegrations: () =>
+    request<{ uuid: string; keys: ApiKey[] }>(`${BASE}/integrations/info`),
+
+  createApiKey: (nome: string) =>
+    request<{ key: ApiKey; fullKey: string }>(`${BASE}/integrations/keys`, {
+      method: 'POST',
+      body: JSON.stringify({ nome }),
+    }),
+
+  revokeApiKey: (id: number) =>
+    request<{ ok: boolean }>(`${BASE}/integrations/keys/${id}`, { method: 'DELETE' }),
 
   saveToken: (token: string) => sessionStorage.setItem('admin_token', token),
   clearToken: () => sessionStorage.removeItem('admin_token'),

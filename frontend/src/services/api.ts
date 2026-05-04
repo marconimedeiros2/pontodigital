@@ -7,8 +7,15 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Erro na requisição');
+  
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    throw new Error('Erro de conexão: o servidor pode estar offline.');
+  }
+
+  if (!res.ok) throw new Error(data?.error || 'Erro na requisição');
   return data as T;
 }
 

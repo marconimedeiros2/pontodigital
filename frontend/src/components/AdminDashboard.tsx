@@ -1145,7 +1145,18 @@ function AddRegistroModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
   );
 }
 
-const today = new Date().toISOString().split('T')[0];
+/** Retorna YYYY-MM-DD no fuso local, sem depender de UTC */
+function localDateStr(offsetDays = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() - offsetDays);
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, '0'),
+    String(d.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+const today = localDateStr(0);
 
 type TimeField = 'hora_inicial' | 'inicio_intervalo' | 'fim_intervalo' | 'hora_final';
 
@@ -1693,12 +1704,14 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     try { await adminApi.deleteUsuario(pin); await loadUsuarios(); } catch { /* ignore */ }
   };
 
-  const handleRelatorio = async () => {
+  const handleRelatorio = async (iniOverride?: string, fimOverride?: string) => {
+    const ini = iniOverride ?? relInicio;
+    const fim = fimOverride ?? relFim;
     setRelLoading(true);
     setRelSelected(new Set());
     setMostrarOcultos(false);
     try {
-      const data = await adminApi.getRelatorio(relInicio || undefined, relFim || undefined, true);
+      const data = await adminApi.getRelatorio(ini || undefined, fim || undefined, true);
       setRelDataAll(data.registros);
       if (data.registros.length > 0) {
         const ids = data.registros.map((r) => r.id);
@@ -2159,30 +2172,31 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                     onChange={(e) => setRelFim(e.target.value)} className="text-input" />
                 </div>
                 <button className="search-btn" style={{ alignSelf: 'flex-end' }}
-                  onClick={handleRelatorio} disabled={relLoading}>
+                  onClick={() => handleRelatorio()} disabled={relLoading}>
                   {relLoading ? <span className="spinner" /> : 'Buscar'}
                 </button>
               </div>
 
               <div className="rel-quick-filters">
                 {[
-                  { label: 'Hoje',            days: 0  },
-                  { label: 'Ontem',           days: 1  },
-                  { label: 'Anteontem',       days: 2  },
-                  { label: 'Últimos 7 dias',  days: 6  },
-                  { label: 'Últimos 30 dias', days: 29 },
-                ].map(({ label, days }) => {
-                  const end   = new Date();
-                  const start = new Date(); start.setDate(start.getDate() - days);
-                  const fmt = (d: Date) => d.toISOString().split('T')[0];
-                  const endStr   = fmt(end);
-                  const startStr = fmt(start);
-                  const active = relInicio === startStr && relFim === endStr;
+                  { label: 'Hoje',            startOff: 0,  endOff: 0  },
+                  { label: 'Ontem',           startOff: 1,  endOff: 1  },
+                  { label: 'Anteontem',       startOff: 2,  endOff: 2  },
+                  { label: 'Últimos 7 dias',  startOff: 6,  endOff: 0  },
+                  { label: 'Últimos 30 dias', startOff: 29, endOff: 0  },
+                ].map(({ label, startOff, endOff }) => {
+                  const startStr = localDateStr(startOff);
+                  const endStr   = localDateStr(endOff);
+                  const active   = relInicio === startStr && relFim === endStr;
                   return (
                     <button
                       key={label}
                       className={`rel-quick-btn${active ? ' rel-quick-btn--active' : ''}`}
-                      onClick={() => { setRelInicio(startStr); setRelFim(endStr); }}
+                      onClick={() => {
+                        setRelInicio(startStr);
+                        setRelFim(endStr);
+                        handleRelatorio(startStr, endStr);
+                      }}
                     >
                       {label}
                     </button>

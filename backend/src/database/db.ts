@@ -422,6 +422,13 @@ export const db = {
     return data as CustomField;
   },
 
+  async deleteCustomField(id: number): Promise<void> {
+    // Remove valores associados primeiro para não violar FK
+    await supabase.from('custom_field_values').delete().eq('field_id', id);
+    const { error } = await supabase.from('custom_fields').delete().eq('id', id);
+    if (error) raise(error, 'deleteCustomField');
+  },
+
   // ── Custom Field Values ────────────────────────────────────────────────────
 
   async getCustomValues(registroIds: number[]): Promise<CustomFieldValue[]> {

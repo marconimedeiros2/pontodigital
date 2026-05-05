@@ -534,12 +534,12 @@ router.put('/custom-fields/:id', authMiddleware, async (req: Request, res: Respo
   }
 });
 
-// DELETE /api/admin/custom-fields/:id  (soft delete — ativo = false)
+// DELETE /api/admin/custom-fields/:id  (hard delete — remove do banco)
 router.delete('/custom-fields/:id', authMiddleware, async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'ID inválido.' });
   try {
-    await db.updateCustomField(id, { ativo: false });
+    await db.deleteCustomField(id);
     return res.json({ ok: true });
   } catch (err) {
     console.error('[DELETE /custom-fields/:id]', err);

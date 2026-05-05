@@ -5,21 +5,35 @@ import path from 'path';
 import pontoRoutes from './routes/ponto';
 import adminRoutes from './routes/admin';
 import contadorRoutes from './routes/contador';
+import { tenantMiddleware } from './middleware/tenant';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// CORS
+// CORS — aceita qualquer subdomínio de flowbase.tech
+const BASE_DOMAIN = process.env.BASE_DOMAIN || 'flowbase.tech';
 app.use(cors({
-  origin: process.env.FRONTEND_URL || true,
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // same-origin / server-to-server
+    const allowed =
+      origin === `https://${BASE_DOMAIN}` ||
+      origin === `http://${BASE_DOMAIN}` ||
+      /^https?:\/\/[a-z0-9-]+\.flowbase\.tech(:\d+)?$/.test(origin) ||
+      origin.includes('localhost');
+    callback(null, allowed);
+  },
   credentials: true,
 }));
 
 app.use(express.json());
 
+// ── Multi-tenant: detecta subdomínio e injeta req.client em todas as rotas ──
+app.use(tenantMiddleware);
+
 // Log API requests
 app.use('/api', (req, _res, next) => {
-  console.log(`[API] ${req.method} ${req.path}`);
+  const tenant = req.subdomain ? `[tenant:${req.subdomain}]` : '[root]';
+  console.log(`[API] ${tenant} ${req.method} ${req.path}`);
   next();
 });
 
@@ -31,6 +45,14 @@ app.use('/api/contador', contadorRoutes);
 // Health check
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Diagnóstico de tenant — útil para o frontend saber qual cliente está ativo
+app.get('/api/tenant', (req, res) => {
+  res.json({
+    subdomain: req.subdomain ?? null,
+    client: req.client ?? null,
+  });
 });
 
 

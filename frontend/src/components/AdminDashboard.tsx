@@ -1946,9 +1946,6 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
             <div className="admin-section-header">
               <h2>Dashboard</h2>
               <div className="dash-controls">
-                <input type="date" value={dashDate}
-                  onChange={(e) => setDashDate(e.target.value)}
-                  className="text-input" style={{ width: 160 }} />
                 <button
                   className={`dash-pin-toggle${showPins ? ' dash-pin-toggle--visible' : ''}`}
                   onClick={() => setShowPins((v) => !v)}
@@ -1967,6 +1964,9 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   )}
                   {showPins ? 'Ocultar PINs' : 'Mostrar PINs'}
                 </button>
+                <input type="date" value={dashDate}
+                  onChange={(e) => setDashDate(e.target.value)}
+                  className="text-input" style={{ width: 160 }} />
                 <button className="search-btn" onClick={loadDashboard}>Atualizar</button>
               </div>
             </div>

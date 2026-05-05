@@ -1997,18 +1997,24 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                 <>
                   {/* ── Stat cards ── */}
                   <div className="stats-grid dash-stats-grid">
-                    {[
-                      { label: 'Total do Dia',  value: stats.total,        color: 'var(--status-primary)',  icon: '👥' },
-                      { label: 'Presentes',     value: stats.presentes,    color: 'var(--status-success)',  icon: '✅' },
-                      { label: 'Em Intervalo',  value: stats.emIntervalo,  color: 'var(--status-warning)',  icon: '☕' },
-                      { label: 'Saíram',        value: stats.saiu,         color: 'var(--status-danger)',   icon: '🚪' },
-                      { label: 'Dia Completo',  value: stats.completos,    color: '#10b981',                icon: '🏁' },
-                      { label: 'Ausentes',      value: ausentesCount,      color: 'var(--text-muted)',      icon: '❌' },
-                    ].map((s) => (
-                      <div key={s.label} className="stat-card" style={{ borderTopColor: s.color }}>
+                    {([
+                      { label: 'Total do Dia', value: stats.total, accent: '#4a6cf7',
+                        icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
+                      { label: 'Presentes', value: stats.presentes, accent: '#22c55e',
+                        icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
+                      { label: 'Em Intervalo', value: stats.emIntervalo, accent: '#f59e0b',
+                        icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
+                      { label: 'Saíram', value: stats.saiu, accent: '#ef4444',
+                        icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> },
+                      { label: 'Dia Completo', value: stats.completos, accent: '#10b981',
+                        icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg> },
+                      { label: 'Ausentes', value: ausentesCount, accent: '#94a3b8',
+                        icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="7" r="4"/><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><line x1="4" y1="4" x2="20" y2="20"/></svg> },
+                    ] as { label: string; value: number; accent: string; icon: React.ReactNode }[]).map((s) => (
+                      <div key={s.label} className="stat-card dash-stat-card" style={{ '--sc-accent': s.accent } as React.CSSProperties}>
                         <div className="stat-card-top">
-                          <span className="stat-icon">{s.icon}</span>
-                          <span className="stat-value" style={{ color: s.color }}>{s.value}</span>
+                          <span className="dash-stat-icon">{s.icon}</span>
+                          <span className="stat-value">{s.value}</span>
                         </div>
                         <span className="stat-label">{s.label}</span>
                       </div>
@@ -2046,21 +2052,27 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   {/* ── Métricas ── */}
                   <div className="dash-metrics-row">
                     <div className="dash-metric-card">
-                      <span className="dash-metric-icon">⏱️</span>
+                      <span className="dash-metric-svg-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      </span>
                       <div className="dash-metric-body">
                         <span className="dash-metric-label">Total Horas Trabalhadas</span>
                         <span className="dash-metric-value">{workedMins > 0 ? minToHuman(workedMins) : '—'}</span>
                       </div>
                     </div>
                     <div className="dash-metric-card">
-                      <span className="dash-metric-icon">🕐</span>
+                      <span className="dash-metric-svg-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12"/><line x1="12" y1="12" x2="15" y2="9"/></svg>
+                      </span>
                       <div className="dash-metric-body">
                         <span className="dash-metric-label">Média de Entrada</span>
                         <span className="dash-metric-value">{avgEntryStr}</span>
                       </div>
                     </div>
                     <div className="dash-metric-card">
-                      <span className="dash-metric-icon">🥇</span>
+                      <span className="dash-metric-svg-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></svg>
+                      </span>
                       <div className="dash-metric-body">
                         <span className="dash-metric-label">Primeiro a Chegar</span>
                         <span className="dash-metric-value">
@@ -2069,7 +2081,9 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                       </div>
                     </div>
                     <div className="dash-metric-card">
-                      <span className="dash-metric-icon">🏆</span>
+                      <span className="dash-metric-svg-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                      </span>
                       <div className="dash-metric-body">
                         <span className="dash-metric-label">Mais Horas no Dia</span>
                         <span className="dash-metric-value">

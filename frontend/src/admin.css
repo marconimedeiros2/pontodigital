@@ -269,10 +269,47 @@
   box-shadow: var(--shadow);
 }
 
-.stat-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.stat-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .stat-icon { font-size: 1.2rem; }
 .stat-value { display: block; font-size: 2rem; font-weight: 800; }
 .stat-label { display: block; font-size: 0.8rem; color: var(--text-muted); font-weight: 500; margin-top: 2px; }
+
+/* Dash stat card — icon-based, accent via CSS var */
+.dash-stat-card {
+  border-top: 3px solid var(--sc-accent, #4a6cf7);
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+.dash-stat-card:hover { box-shadow: 0 4px 18px rgba(74,108,247,0.13); transform: translateY(-2px); }
+
+.dash-stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--sc-accent, #4a6cf7) 12%, transparent);
+  color: var(--sc-accent, #4a6cf7);
+  flex-shrink: 0;
+}
+
+.dash-stat-card .stat-value {
+  color: var(--sc-accent, #4a6cf7);
+  font-size: 1.9rem;
+}
+
+/* Metric icon — circle badge */
+.dash-metric-svg-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: rgba(74,108,247,0.1);
+  color: #4a6cf7;
+  flex-shrink: 0;
+}
 
 /* Presence bar */
 .dash-presence-card {
@@ -340,7 +377,7 @@
   align-items: center;
   gap: 14px;
 }
-.dash-metric-icon { font-size: 1.5rem; flex-shrink: 0; }
+.dash-metric-icon { font-size: 1.5rem; flex-shrink: 0; } /* legacy */
 .dash-metric-body { display: flex; flex-direction: column; min-width: 0; }
 .dash-metric-label {
   font-size: 0.75rem;

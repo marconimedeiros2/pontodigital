@@ -2359,19 +2359,21 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               </button>
             </div>
 
-            <div className="admin-card">
+            <div className="admin-card rel-filter-card">
               <div className="rel-filters">
-                <div className="input-group">
-                  <label className="input-label">Data Inicial</label>
-                  <input type="date" value={relInicio}
-                    onChange={(e) => setRelInicio(e.target.value)} className="text-input" />
+                <div className="rel-dates-row">
+                  <div className="input-group">
+                    <label className="input-label">Data Inicial</label>
+                    <input type="date" value={relInicio}
+                      onChange={(e) => setRelInicio(e.target.value)} className="text-input" />
+                  </div>
+                  <div className="input-group">
+                    <label className="input-label">Data Final</label>
+                    <input type="date" value={relFim}
+                      onChange={(e) => setRelFim(e.target.value)} className="text-input" />
+                  </div>
                 </div>
-                <div className="input-group">
-                  <label className="input-label">Data Final</label>
-                  <input type="date" value={relFim}
-                    onChange={(e) => setRelFim(e.target.value)} className="text-input" />
-                </div>
-                <button className="search-btn" style={{ alignSelf: 'flex-end' }}
+                <button className="search-btn rel-search-btn"
                   onClick={() => handleRelatorio()} disabled={relLoading}>
                   {relLoading ? <span className="spinner" /> : 'Buscar'}
                 </button>

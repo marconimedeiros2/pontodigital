@@ -533,11 +533,30 @@ code {
   align-items: flex-end;
 }
 
+/* ── Relatório filter card ──────────────────────────────── */
+.rel-filter-card { gap: 16px !important; }
+
+.rel-filters {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.rel-dates-row {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+}
+
+.rel-dates-row .input-group { flex: 1; min-width: 0; }
+.rel-dates-row .text-input  { width: 100%; }
+
+.rel-search-btn { white-space: nowrap; flex-shrink: 0; align-self: flex-end; }
+
 .rel-quick-filters {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 16px;
 }
 
 .rel-quick-btn {
@@ -883,9 +902,9 @@ code {
   .admin-sidebar-footer { padding: 8px 6px; border-top: none; border-left: 1px solid rgba(255,255,255,0.08); }
   .admin-logout-btn { white-space: nowrap; padding: 7px 10px; font-size: 0.78rem; }
   .admin-main { padding: 16px; }
-  .add-user-form { grid-template-columns: 1fr; }
-  .rel-filters { flex-direction: column; }
   .add-user-form { grid-template-columns: 1fr 1fr; }
+  .rel-filters { flex-direction: column; align-items: stretch; }
+  .rel-search-btn { width: 100%; justify-content: center; }
   .bulk-jornada-bar { flex-direction: column; align-items: flex-start; gap: 8px; }
 }
 

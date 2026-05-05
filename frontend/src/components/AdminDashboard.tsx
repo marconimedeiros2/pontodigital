@@ -245,6 +245,24 @@ function minutesToHHMM(min: number): string {
   return `${h}:${String(m).padStart(2, '0')}`;
 }
 
+/** Converte "HH:MM" ou "YYYY-MM-DD HH:MM:SS" → minutos desde meia-noite */
+function timeToMin(t: string | null): number | null {
+  if (!t) return null;
+  const part = t.includes(' ') ? t.split(' ')[1] : t;
+  const [h, m] = part.split(':').map(Number);
+  if (isNaN(h) || isNaN(m)) return null;
+  return h * 60 + m;
+}
+
+/** Formata minutos → "HHh MM min" (ex: 7h 20 min) */
+function minToHuman(min: number): string {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  if (h === 0) return `${m} min`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m} min`;
+}
+
 function hhmmToMinutes(str: string): number {
   const [h, m] = str.split(':').map(Number);
   if (isNaN(h) || isNaN(m) || m < 0 || m > 59) return NaN;
@@ -1601,8 +1619,12 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const loadDashboard = useCallback(async () => {
     setDashLoading(true);
     try {
-      const data = await adminApi.getDashboard(dashDate);
-      setDashData({ registros: data.registros, stats: data.stats });
+      const [dash, usersRes] = await Promise.all([
+        adminApi.getDashboard(dashDate),
+        adminApi.listUsuarios(),
+      ]);
+      setDashData({ registros: dash.registros, stats: dash.stats });
+      setUsuarios(usersRes.usuarios);
     } catch { /* ignore */ } finally { setDashLoading(false); }
   }, [dashDate]);
 
@@ -1932,65 +1954,176 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
 
             {dashLoading && <div className="admin-loading"><span className="spinner spinner--large" /></div>}
 
-            {dashData && !dashLoading && (
-              <>
-                <div className="stats-grid">
-                  {[
-                    { label: 'Registros', value: dashData.stats.total, color: 'var(--status-primary)' },
-                    { label: 'Presentes', value: dashData.stats.presentes, color: 'var(--status-success)' },
-                    { label: 'Em Intervalo', value: dashData.stats.emIntervalo, color: 'var(--status-warning)' },
-                    { label: 'Saíram', value: dashData.stats.saiu, color: 'var(--status-danger)' },
-                  ].map((s) => (
-                    <div key={s.label} className="stat-card" style={{ borderTopColor: s.color }}>
-                      <span className="stat-value" style={{ color: s.color }}>{s.value}</span>
-                      <span className="stat-label">{s.label}</span>
-                    </div>
-                  ))}
-                </div>
+            {dashData && !dashLoading && (() => {
+              const { stats, registros } = dashData;
+              const activeUsers = usuarios.filter((u) => u.ativo);
+              const ausentesCount = Math.max(0, activeUsers.length - stats.total);
 
-                {dashData.registros.length === 0 ? (
-                  <div className="admin-empty">Nenhum registro nesta data.</div>
-                ) : (
-                  <div className="admin-table-wrap">
-                    <div className="admin-table-actions">
-                      <span className="history-count">{dashData.registros.length} registros</span>
-                      <ExportButtons registros={dashData.registros} prefix={`ponto_${dashDate}`} />
-                    </div>
-                    <table className="admin-table">
-                      <thead>
-                        <tr>
-                          <th>Funcionário</th>
-                          <th>PIN</th>
-                          <th>{STEP_LABELS.hora_inicial}</th>
-                          <th>{STEP_LABELS.inicio_intervalo}</th>
-                          <th>{STEP_LABELS.fim_intervalo}</th>
-                          <th>{STEP_LABELS.hora_final}</th>
-                          <th>Trabalhado</th>
-                          <th>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {dashData.registros.map((r) => (
-                          <tr key={r.id}>
-                            <td className="td-nome">{r.nome}</td>
-                            <td><code>{r.pin}</code></td>
-                            {(['hora_inicial', 'inicio_intervalo', 'fim_intervalo', 'hora_final'] as const).map((f) => (
-                              <td key={f}>
-                                {r[f]
-                                  ? <span className="dash-time" title={localTimestamp(r[f])}>{displayTime(r[f])}</span>
-                                  : '—'}
-                              </td>
-                            ))}
-                            <td><strong>{calcWorkTime(r)}</strong></td>
-                            <td><StatusBadge reg={r} /></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+              // Horas trabalhadas (registros completos)
+              const workedMins = registros.reduce((acc, r) => {
+                const wt = calcWorkTime(r);
+                if (wt === '—') return acc;
+                const [h, m] = wt.split(':').map(Number);
+                return acc + h * 60 + m;
+              }, 0);
+
+              // Média de entrada
+              const entryMins = registros.map((r) => timeToMin(r.hora_inicial)).filter((v): v is number => v !== null);
+              const avgEntryMin = entryMins.length > 0
+                ? Math.round(entryMins.reduce((a, b) => a + b, 0) / entryMins.length) : null;
+              const avgEntryStr = avgEntryMin !== null ? minutesToHHMM(avgEntryMin) : '—';
+
+              // Primeiro a chegar
+              const sorted = [...registros].filter((r) => r.hora_inicial)
+                .sort((a, b) => (timeToMin(a.hora_inicial)! - timeToMin(b.hora_inicial)!));
+              const firstIn = sorted[0] ?? null;
+
+              // Mais horas trabalhadas
+              const byWork = [...registros]
+                .map((r) => ({ r, min: (() => { const wt = calcWorkTime(r); if (wt === '—') return -1; const [h, m] = wt.split(':').map(Number); return h * 60 + m; })() }))
+                .filter((x) => x.min >= 0)
+                .sort((a, b) => b.min - a.min);
+              const topWorker = byWork[0] ?? null;
+
+              // Barra de presença
+              const total = stats.total || 1;
+              const barSegments = [
+                { pct: Math.round((stats.presentes / total) * 100), color: 'var(--status-success)', label: 'Presentes' },
+                { pct: Math.round((stats.emIntervalo / total) * 100), color: 'var(--status-warning)', label: 'Intervalo' },
+                { pct: Math.round((stats.saiu / total) * 100), color: 'var(--status-danger)', label: 'Saíram' },
+              ];
+
+              return (
+                <>
+                  {/* ── Stat cards ── */}
+                  <div className="stats-grid dash-stats-grid">
+                    {[
+                      { label: 'Total do Dia',  value: stats.total,        color: 'var(--status-primary)',  icon: '👥' },
+                      { label: 'Presentes',     value: stats.presentes,    color: 'var(--status-success)',  icon: '✅' },
+                      { label: 'Em Intervalo',  value: stats.emIntervalo,  color: 'var(--status-warning)',  icon: '☕' },
+                      { label: 'Saíram',        value: stats.saiu,         color: 'var(--status-danger)',   icon: '🚪' },
+                      { label: 'Dia Completo',  value: stats.completos,    color: '#10b981',                icon: '🏁' },
+                      { label: 'Ausentes',      value: ausentesCount,      color: 'var(--text-muted)',      icon: '❌' },
+                    ].map((s) => (
+                      <div key={s.label} className="stat-card" style={{ borderTopColor: s.color }}>
+                        <div className="stat-card-top">
+                          <span className="stat-icon">{s.icon}</span>
+                          <span className="stat-value" style={{ color: s.color }}>{s.value}</span>
+                        </div>
+                        <span className="stat-label">{s.label}</span>
+                      </div>
+                    ))}
                   </div>
-                )}
-              </>
-            )}
+
+                  {/* ── Barra de presença ── */}
+                  {stats.total > 0 && (
+                    <div className="dash-presence-card">
+                      <div className="dash-presence-title">Distribuição de Presença</div>
+                      <div className="dash-presence-bar">
+                        {barSegments.map((seg) => (
+                          seg.pct > 0 && (
+                            <div
+                              key={seg.label}
+                              className="dash-presence-segment"
+                              style={{ width: `${seg.pct}%`, background: seg.color }}
+                              title={`${seg.label}: ${seg.pct}%`}
+                            />
+                          )
+                        ))}
+                      </div>
+                      <div className="dash-presence-legend">
+                        {barSegments.map((seg) => (
+                          <div key={seg.label} className="dash-legend-item">
+                            <span className="dash-legend-dot" style={{ background: seg.color }} />
+                            <span>{seg.label}</span>
+                            <strong>{seg.pct}%</strong>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Métricas ── */}
+                  <div className="dash-metrics-row">
+                    <div className="dash-metric-card">
+                      <span className="dash-metric-icon">⏱️</span>
+                      <div className="dash-metric-body">
+                        <span className="dash-metric-label">Total Horas Trabalhadas</span>
+                        <span className="dash-metric-value">{workedMins > 0 ? minToHuman(workedMins) : '—'}</span>
+                      </div>
+                    </div>
+                    <div className="dash-metric-card">
+                      <span className="dash-metric-icon">🕐</span>
+                      <div className="dash-metric-body">
+                        <span className="dash-metric-label">Média de Entrada</span>
+                        <span className="dash-metric-value">{avgEntryStr}</span>
+                      </div>
+                    </div>
+                    <div className="dash-metric-card">
+                      <span className="dash-metric-icon">🥇</span>
+                      <div className="dash-metric-body">
+                        <span className="dash-metric-label">Primeiro a Chegar</span>
+                        <span className="dash-metric-value">
+                          {firstIn ? `${firstIn.nome.split(' ')[0]} · ${displayTime(firstIn.hora_inicial)}` : '—'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="dash-metric-card">
+                      <span className="dash-metric-icon">🏆</span>
+                      <div className="dash-metric-body">
+                        <span className="dash-metric-label">Mais Horas no Dia</span>
+                        <span className="dash-metric-value">
+                          {topWorker ? `${topWorker.r.nome.split(' ')[0]} · ${calcWorkTime(topWorker.r)}` : '—'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── Tabela ── */}
+                  {registros.length === 0 ? (
+                    <div className="admin-empty">Nenhum registro nesta data.</div>
+                  ) : (
+                    <div className="admin-table-wrap">
+                      <div className="admin-table-actions">
+                        <span className="history-count">{registros.length} {registros.length === 1 ? 'registro' : 'registros'}</span>
+                        <ExportButtons registros={registros} prefix={`ponto_${dashDate}`} />
+                      </div>
+                      <table className="admin-table">
+                        <thead>
+                          <tr>
+                            <th>Funcionário</th>
+                            <th>PIN</th>
+                            <th>{STEP_LABELS.hora_inicial}</th>
+                            <th>{STEP_LABELS.inicio_intervalo}</th>
+                            <th>{STEP_LABELS.fim_intervalo}</th>
+                            <th>{STEP_LABELS.hora_final}</th>
+                            <th>Trabalhado</th>
+                            <th>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {registros.map((r) => (
+                            <tr key={r.id} className={`dash-row--${r.hora_final ? 'saiu' : r.fim_intervalo ? 'voltou' : r.inicio_intervalo ? 'intervalo' : 'presente'}`}>
+                              <td className="td-nome">{r.nome}</td>
+                              <td><code>{r.pin}</code></td>
+                              {(['hora_inicial', 'inicio_intervalo', 'fim_intervalo', 'hora_final'] as const).map((f) => (
+                                <td key={f}>
+                                  {r[f]
+                                    ? <span className="dash-time" title={localTimestamp(r[f])}>{displayTime(r[f])}</span>
+                                    : <span className="dash-missing">—</span>}
+                                </td>
+                              ))}
+                              <td><strong>{calcWorkTime(r)}</strong></td>
+                              <td><StatusBadge reg={r} /></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
 

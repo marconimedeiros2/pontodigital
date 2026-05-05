@@ -539,6 +539,15 @@
     z-index: 2;
     background-color: var(--bg);
   }
+  .admin-table--has-check tbody td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background-color: var(--bg-card) !important;
+  }
+  .admin-table--has-check tr:hover td:first-child {
+    background-color: var(--bg) !important;
+  }
   .admin-table--has-check thead th.th-nome {
     position: sticky;
     left: 36px;

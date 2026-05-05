@@ -868,44 +868,90 @@ code {
   border-radius: var(--radius);
 }
 
-/* Mobile */
-@media (max-width: 640px) {
-  .admin-layout { flex-direction: column; }
-  .admin-sidebar {
-    width: 100%;
-    flex-direction: row;
-    padding: 0;
-    border-right: none;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-    overflow-x: auto;
+/* ── Bottom Navigation Bar ─────────────────────────────── */
+.admin-bottom-nav { display: none; }
+
+@media (max-width: 768px) {
+  /* Esconde a sidebar, mostra bottom nav */
+  .admin-sidebar { display: none; }
+
+  .admin-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background: #1e2a4a;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    z-index: 100;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.18);
   }
-  .admin-sidebar-brand { display: none; }
-  .admin-nav {
-    flex-direction: row;
+
+  .admin-bottom-nav-btn {
     flex: 1;
-    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     gap: 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: rgba(255,255,255,0.45);
+    transition: color 0.15s;
+    padding: 8px 4px;
+    position: relative;
   }
-  .admin-nav-btn {
-    font-size: 0.78rem;
-    padding: 7px 12px;
+
+  .admin-bottom-nav-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20%;
+    right: 20%;
+    height: 2px;
+    border-radius: 0 0 3px 3px;
+    background: #60a5fa;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .admin-bottom-nav-btn.active {
+    color: #60a5fa;
+  }
+
+  .admin-bottom-nav-btn.active::before {
+    opacity: 1;
+  }
+
+  .admin-bottom-nav-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .admin-bottom-nav-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
     white-space: nowrap;
-    border-left: none;
-    border-bottom: 2px solid transparent;
-    border-radius: 6px 6px 0 0;
   }
-  .admin-nav-btn.active {
-    border-left-color: transparent;
-    border-bottom-color: #60a5fa;
+
+  /* Empurra o conteúdo para não ficar atrás do nav */
+  .admin-main {
+    padding: 16px 16px 80px;
+    padding-bottom: calc(64px + 16px);
   }
-  .admin-nav-icon { display: none; }
-  .admin-sidebar-footer { padding: 8px 6px; border-top: none; border-left: 1px solid rgba(255,255,255,0.08); }
-  .admin-logout-btn { white-space: nowrap; padding: 7px 10px; font-size: 0.78rem; }
-  .admin-main { padding: 16px; }
+
   .add-user-form { grid-template-columns: 1fr 1fr; }
   .rel-filters { flex-direction: column; align-items: stretch; }
   .rel-search-btn { width: 100%; justify-content: center; }
   .bulk-jornada-bar { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .dash-stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .dash-metrics-row { grid-template-columns: repeat(2, 1fr); }
+  .admin-section { gap: 18px; }
 }
 
 /* ── Jornada badge ─────────────────────────────────────────────────────────── */

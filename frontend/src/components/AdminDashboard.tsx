@@ -1939,6 +1939,30 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
         </div>
       </aside>
 
+      {/* ── Bottom Nav (mobile) ── */}
+      <nav className="admin-bottom-nav">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            className={`admin-bottom-nav-btn${tab === t.id ? ' active' : ''}`}
+            onClick={() => {
+              setTab(t.id);
+              if (t.id === 'relatorio') {
+                const d = localDateStr(0);
+                setRelInicio(d);
+                setRelFim(d);
+                handleRelatorio(d, d);
+              }
+            }}
+          >
+            <span className="admin-bottom-nav-icon">
+              {React.cloneElement(t.icon as React.ReactElement, { width: 22, height: 22 })}
+            </span>
+            <span className="admin-bottom-nav-label">{t.label}</span>
+          </button>
+        ))}
+      </nav>
+
       <main className="admin-main">
         {/* ── DASHBOARD ── */}
         {tab === 'dashboard' && (

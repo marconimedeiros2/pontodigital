@@ -486,7 +486,48 @@
 
 .admin-table tr:last-child td { border-bottom: none; }
 .admin-table tr:hover td { background: var(--bg); }
+
 .td-nome { font-weight: 600; }
+
+/* ── Sticky nome column — APENAS MOBILE ─────────────────── */
+@media (max-width: 768px) {
+
+  /* Base: td-nome fica fixo à esquerda */
+  .td-nome {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--bg-card);
+    box-shadow: 3px 0 6px -2px rgba(0,0,0,0.12);
+  }
+  .admin-table tr:hover .td-nome { background: var(--bg); }
+
+  /* Dashboard: nome é col 1, th também fica fixo */
+  .admin-table--sticky-nome thead th:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--bg);
+    box-shadow: 3px 0 6px -2px rgba(0,0,0,0.12);
+  }
+
+  /* Funcionários: checkbox (36px) + nome (col 2) */
+  .admin-table--has-check .td-nome { left: 36px; }
+
+  .admin-table--has-check thead th:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--bg);
+  }
+  .admin-table--has-check thead th.th-nome {
+    position: sticky;
+    left: 36px;
+    z-index: 2;
+    background: var(--bg);
+    box-shadow: 3px 0 6px -2px rgba(0,0,0,0.12);
+  }
+}
 
 code {
   background: var(--bg);

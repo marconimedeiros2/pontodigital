@@ -2145,7 +2145,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                         <span className="history-count">{registros.length} {registros.length === 1 ? 'registro' : 'registros'}</span>
                         <ExportButtons registros={registros} prefix={`ponto_${dashDate}`} />
                       </div>
-                      <table className="admin-table">
+                      <table className="admin-table admin-table--sticky-nome">
                         <thead>
                           <tr>
                             <th>Funcionário</th>
@@ -2287,14 +2287,14 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                     </div>
                   </div>
                 )}
-                <table className="admin-table">
+                <table className="admin-table admin-table--has-check">
                   <thead>
                     <tr>
                       <th style={{ width: 36 }}>
                         <input type="checkbox" className="rel-checkbox"
                           checked={allUsuariosSelected} onChange={toggleAllUsuarios} />
                       </th>
-                      <th>Nome</th><th>PIN</th><th>Horas Diárias</th><th>Intervalo</th><th>Status</th><th>Ações</th>
+                      <th className="th-nome">Nome</th><th>PIN</th><th>Horas Diárias</th><th>Intervalo</th><th>Status</th><th>Ações</th>
                     </tr>
                   </thead>
                   <tbody>

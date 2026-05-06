@@ -138,14 +138,27 @@ router.get('/clients', godAuthMiddleware, async (_req: Request, res: Response) =
 });
 
 router.post('/clients', godAuthMiddleware, async (req: Request, res: Response) => {
-  const { subdomain, nome } = req.body as { subdomain?: string; nome?: string };
+  const { subdomain, nome, senha } = req.body as { subdomain?: string; nome?: string; senha?: string };
   if (!subdomain || !nome) return res.status(400).json({ error: 'subdomain e nome são obrigatórios.' });
   if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(subdomain))
     return res.status(400).json({ error: 'Subdomínio inválido.' });
 
   const { data, error } = await supabase.from('clients').insert({ subdomain, nome }).select().single();
   if (error) return res.status(400).json({ error: error.message });
-  return res.status(201).json(data);
+
+  // Seed admin_config for the new tenant so they can log in immediately
+  const newClient = data as { id: string };
+  const defaultPw = crypto.createHash('sha256')
+    .update(senha || 'admin123')
+    .digest('hex');
+  await supabase.from('admin_config').insert({
+    client_id: newClient.id,
+    password_hash: defaultPw,
+    escala_padrao: 440,
+    intervalo_padrao: 60,
+  });
+
+  return res.status(201).json({ ...newClient, defaultSenha: senha ? undefined : 'admin123' });
 });
 
 router.patch('/clients/:id', godAuthMiddleware, async (req: Request, res: Response) => {

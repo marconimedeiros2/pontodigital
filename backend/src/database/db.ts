@@ -4,7 +4,8 @@ import { supabase } from './supabaseClient';
 export interface Registro {
   id: number;
   usuario_id: string;
-  pin: string; // PIN usado no momento do registro (histórico)
+  client_id: string;
+  pin: string;
   data: string;
   hora_inicial: string | null;
   inicio_intervalo: string | null;
@@ -18,7 +19,8 @@ export interface Registro {
 }
 
 export interface Usuario {
-  id: string; // UUID — chave estável, não muda ao trocar PIN
+  id: string;
+  client_id: string;
   pin: string;
   nome: string;
   ativo: boolean;
@@ -41,6 +43,7 @@ export interface RegistroLog {
 
 export interface CustomField {
   id: number;
+  client_id: string;
   nome: string;
   tipo: string;
   input_type: string;
@@ -83,6 +86,7 @@ export interface ContadorCliente {
 
 export interface ApiKey {
   id: number;
+  client_id: string;
   nome: string;
   key_prefix: string;
   key_hash: string;
@@ -103,10 +107,11 @@ function raise(error: { message: string } | null, context: string): never {
 export const db = {
   // ── Registros ──────────────────────────────────────────────────────────────
 
-  async findLatestIncomplete(usuarioId: string): Promise<Registro | undefined> {
-    const { data: row, error } = await supabase
+  async findLatestIncomplete(clientId: string, usuarioId: string): Promise<Registro | undefined> {
+    const { data, error } = await supabase
       .from('registros')
       .select('*')
+      .eq('client_id', clientId)
       .eq('usuario_id', usuarioId)
       .eq('oculto', false)
       .is('hora_final', null)
@@ -114,14 +119,15 @@ export const db = {
       .limit(1)
       .maybeSingle();
     if (error) raise(error, 'findLatestIncomplete');
-    return row ?? undefined;
+    return data ?? undefined;
   },
 
-  async hideRecord(id: number): Promise<boolean> {
+  async hideRecord(clientId: string, id: number): Promise<boolean> {
     const { error, data } = await supabase
       .from('registros')
       .update({ oculto: true })
       .eq('id', id)
+      .eq('client_id', clientId)
       .select('id')
       .maybeSingle();
     if (error) raise(error, 'hideRecord');
@@ -129,14 +135,15 @@ export const db = {
   },
 
   async insertRecord(
+    clientId: string,
     usuarioId: string,
     pin: string,
     data: string,
-    fields: Partial<Omit<Registro, 'id' | 'usuario_id' | 'pin' | 'data' | 'created_at'>>
+    fields: Partial<Omit<Registro, 'id' | 'client_id' | 'usuario_id' | 'pin' | 'data' | 'created_at'>>
   ): Promise<Registro> {
     const { data: created, error } = await supabase
       .from('registros')
-      .insert({ usuario_id: usuarioId, pin, data, ...fields })
+      .insert({ client_id: clientId, usuario_id: usuarioId, pin, data, ...fields })
       .select()
       .single();
     if (error) raise(error, 'insertRecord');
@@ -144,23 +151,26 @@ export const db = {
   },
 
   async updateById(
+    clientId: string,
     id: number,
-    fields: Partial<Omit<Registro, 'id' | 'usuario_id' | 'pin' | 'data' | 'created_at'>>
+    fields: Partial<Omit<Registro, 'id' | 'client_id' | 'usuario_id' | 'pin' | 'data' | 'created_at'>>
   ): Promise<Registro> {
     const { data: updated, error } = await supabase
       .from('registros')
       .update(fields)
       .eq('id', id)
+      .eq('client_id', clientId)
       .select()
       .single();
     if (error) raise(error, 'updateById');
     return updated as Registro;
   },
 
-  async findByUsuarioId(usuarioId: string, limit = 30): Promise<Registro[]> {
+  async findByUsuarioId(clientId: string, usuarioId: string, limit = 30): Promise<Registro[]> {
     const { data, error } = await supabase
       .from('registros')
       .select('*')
+      .eq('client_id', clientId)
       .eq('usuario_id', usuarioId)
       .eq('oculto', false)
       .order('created_at', { ascending: false })
@@ -169,10 +179,11 @@ export const db = {
     return (data ?? []) as Registro[];
   },
 
-  async findByDate(data: string): Promise<Registro[]> {
+  async findByDate(clientId: string, data: string): Promise<Registro[]> {
     const { data: rows, error } = await supabase
       .from('registros')
       .select('*')
+      .eq('client_id', clientId)
       .eq('data', data)
       .eq('oculto', false)
       .order('created_at', { ascending: true });
@@ -180,10 +191,11 @@ export const db = {
     return (rows ?? []) as Registro[];
   },
 
-  async findAll(limit = 200): Promise<Registro[]> {
+  async findAll(clientId: string, limit = 200): Promise<Registro[]> {
     const { data, error } = await supabase
       .from('registros')
       .select('*')
+      .eq('client_id', clientId)
       .eq('oculto', false)
       .order('data', { ascending: false })
       .order('created_at', { ascending: false })
@@ -192,10 +204,11 @@ export const db = {
     return (data ?? []) as Registro[];
   },
 
-  async findAllHidden(limit = 200): Promise<Registro[]> {
+  async findAllHidden(clientId: string, limit = 200): Promise<Registro[]> {
     const { data, error } = await supabase
       .from('registros')
       .select('*')
+      .eq('client_id', clientId)
       .eq('oculto', true)
       .order('data', { ascending: false })
       .order('created_at', { ascending: false })
@@ -204,11 +217,12 @@ export const db = {
     return (data ?? []) as Registro[];
   },
 
-  async findById(id: number): Promise<Registro | undefined> {
+  async findById(clientId: string, id: number): Promise<Registro | undefined> {
     const { data, error } = await supabase
       .from('registros')
       .select('*')
       .eq('id', id)
+      .eq('client_id', clientId)
       .maybeSingle();
     if (error) raise(error, 'findById');
     return data ?? undefined;
@@ -223,17 +237,15 @@ export const db = {
     tipo: 'default' | 'custom' = 'default',
     fieldId?: number
   ): Promise<void> {
-    const { error } = await supabase
-      .from('registro_logs')
-      .insert({
-        registro_id: registroId,
-        campo,
-        valor_anterior: valorAnterior,
-        valor_novo: valorNovo,
-        alterado_por: alteradoPor,
-        tipo,
-        field_id: fieldId ?? null,
-      });
+    const { error } = await supabase.from('registro_logs').insert({
+      registro_id: registroId,
+      campo,
+      valor_anterior: valorAnterior,
+      valor_novo: valorNovo,
+      alterado_por: alteradoPor,
+      tipo,
+      field_id: fieldId ?? null,
+    });
     if (error) raise(error, 'insertLog');
   },
 
@@ -249,52 +261,57 @@ export const db = {
 
   // ── Usuários ───────────────────────────────────────────────────────────────
 
-  async listUsuarios(): Promise<Usuario[]> {
+  async listUsuarios(clientId: string): Promise<Usuario[]> {
     const { data, error } = await supabase
       .from('usuarios')
       .select('*')
+      .eq('client_id', clientId)
       .order('nome', { ascending: true });
     if (error) raise(error, 'listUsuarios');
     return (data ?? []) as Usuario[];
   },
 
-  async findUsuario(pin: string): Promise<Usuario | undefined> {
+  async findUsuario(clientId: string, pin: string): Promise<Usuario | undefined> {
     const { data, error } = await supabase
       .from('usuarios')
       .select('*')
+      .eq('client_id', clientId)
       .eq('pin', pin)
       .maybeSingle();
     if (error) raise(error, 'findUsuario');
     return data ?? undefined;
   },
 
-  async createUsuario(pin: string, nome: string, horasDiarias = 440, intervalo = 60): Promise<Usuario> {
+  async createUsuario(clientId: string, pin: string, nome: string, horasDiarias = 440, intervalo = 60): Promise<Usuario> {
     const { data, error } = await supabase
       .from('usuarios')
-      .insert({ pin, nome, ativo: true, horas_diarias: horasDiarias, intervalo })
+      .insert({ client_id: clientId, pin, nome, ativo: true, horas_diarias: horasDiarias, intervalo })
       .select()
       .single();
     if (error) raise(error, 'createUsuario');
     return data as Usuario;
   },
 
-  async bulkUpdateHorasDiarias(pins: string[], horasDiarias: number): Promise<void> {
+  async bulkUpdateHorasDiarias(clientId: string, pins: string[], horasDiarias: number): Promise<void> {
     const { error } = await supabase
       .from('usuarios')
       .update({ horas_diarias: horasDiarias })
+      .eq('client_id', clientId)
       .in('pin', pins);
     if (error) raise(error, 'bulkUpdateHorasDiarias');
   },
 
-  async bulkUpdateIntervalo(pins: string[], intervalo: number): Promise<void> {
+  async bulkUpdateIntervalo(clientId: string, pins: string[], intervalo: number): Promise<void> {
     const { error } = await supabase
       .from('usuarios')
       .update({ intervalo })
+      .eq('client_id', clientId)
       .in('pin', pins);
     if (error) raise(error, 'bulkUpdateIntervalo');
   },
 
   async updateUsuario(
+    clientId: string,
     id: string,
     fields: Partial<Pick<Usuario, 'pin' | 'nome' | 'ativo' | 'horas_diarias' | 'intervalo'>>
   ): Promise<Usuario> {
@@ -302,79 +319,96 @@ export const db = {
       .from('usuarios')
       .update(fields)
       .eq('id', id)
+      .eq('client_id', clientId)
       .select()
       .single();
     if (error) raise(error, 'updateUsuario');
     return data as Usuario;
   },
 
-  async deleteUsuario(pin: string): Promise<boolean> {
+  async deleteUsuario(clientId: string, pin: string): Promise<boolean> {
     const { error, count } = await supabase
       .from('usuarios')
       .delete({ count: 'exact' })
+      .eq('client_id', clientId)
       .eq('pin', pin);
     if (error) raise(error, 'deleteUsuario');
     return (count ?? 0) > 0;
   },
 
-  // Troca PIN: só atualiza usuarios.pin — registros permanecem ligados pelo UUID
   async changeUserPin(
+    clientId: string,
     oldPin: string,
     newPin: string,
     newNome?: string,
     newAtivo?: boolean
   ): Promise<Usuario> {
-    const existing = await this.findUsuario(oldPin);
+    const existing = await this.findUsuario(clientId, oldPin);
     if (!existing) throw new Error('Usuário não encontrado.');
-
     const fields: Partial<Pick<Usuario, 'pin' | 'nome' | 'ativo'>> = { pin: newPin };
     if (newNome !== undefined) fields.nome = newNome.trim();
     if (newAtivo !== undefined) fields.ativo = newAtivo;
-
-    return this.updateUsuario(existing.id, fields);
+    return this.updateUsuario(clientId, existing.id, fields);
   },
 
-  // ── Admin auth ─────────────────────────────────────────────────────────────
+  // ── Admin auth + config ────────────────────────────────────────────────────
 
-  async checkPassword(password: string): Promise<boolean> {
+  async checkPassword(clientId: string, password: string): Promise<boolean> {
     const { data, error } = await supabase
       .from('admin_config')
       .select('password_hash')
-      .eq('id', 1)
-      .single();
-    if (error) return false;
+      .eq('client_id', clientId)
+      .maybeSingle();
+    if (error || !data) return false;
     return (data as { password_hash: string }).password_hash === hashPassword(password);
   },
 
-  async changePassword(newPassword: string): Promise<void> {
+  async changePassword(clientId: string, newPassword: string): Promise<void> {
     const { error } = await supabase
       .from('admin_config')
       .update({ password_hash: hashPassword(newPassword) })
-      .eq('id', 1);
+      .eq('client_id', clientId);
     if (error) raise(error, 'changePassword');
   },
 
-  async getEscalaConfig(): Promise<{ escala_padrao: number; intervalo_padrao: number }> {
+  async getEscalaConfig(clientId: string): Promise<{ escala_padrao: number; intervalo_padrao: number }> {
     const { data, error } = await supabase
       .from('admin_config')
       .select('escala_padrao, intervalo_padrao')
-      .eq('id', 1)
-      .single();
-    if (error) return { escala_padrao: 440, intervalo_padrao: 60 };
+      .eq('client_id', clientId)
+      .maybeSingle();
+    if (error || !data) return { escala_padrao: 440, intervalo_padrao: 60 };
     const row = data as { escala_padrao: number; intervalo_padrao: number };
     return { escala_padrao: row.escala_padrao ?? 440, intervalo_padrao: row.intervalo_padrao ?? 60 };
   },
 
-  async setEscalaConfig(escala_padrao: number, intervalo_padrao: number): Promise<void> {
+  async setEscalaConfig(clientId: string, escala_padrao: number, intervalo_padrao: number): Promise<void> {
     const { error } = await supabase
       .from('admin_config')
       .update({ escala_padrao, intervalo_padrao })
-      .eq('id', 1);
+      .eq('client_id', clientId);
     if (error) raise(error, 'setEscalaConfig');
   },
 
-  async getCustomFieldById(id: number): Promise<CustomField | undefined> {
-    const { data } = await supabase.from('custom_fields').select('*').eq('id', id).maybeSingle();
+  async getClientUuid(clientId: string): Promise<string> {
+    const { data, error } = await supabase
+      .from('admin_config')
+      .select('client_uuid')
+      .eq('client_id', clientId)
+      .single();
+    if (error) raise(error, 'getClientUuid');
+    return (data as { client_uuid: string }).client_uuid;
+  },
+
+  // ── Custom Fields ──────────────────────────────────────────────────────────
+
+  async getCustomFieldById(clientId: string, id: number): Promise<CustomField | undefined> {
+    const { data } = await supabase
+      .from('custom_fields')
+      .select('*')
+      .eq('id', id)
+      .eq('client_id', clientId)
+      .maybeSingle();
     return (data as CustomField | null) ?? undefined;
   },
 
@@ -388,20 +422,22 @@ export const db = {
     return (data as { value: string | null } | null)?.value ?? null;
   },
 
-  // ── Custom Fields ──────────────────────────────────────────────────────────
-
-  async listCustomFields(includeInactive = false): Promise<CustomField[]> {
-    let query = supabase.from('custom_fields').select('*').order('ordem', { ascending: true });
+  async listCustomFields(clientId: string, includeInactive = false): Promise<CustomField[]> {
+    let query = supabase
+      .from('custom_fields')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('ordem', { ascending: true });
     if (!includeInactive) query = query.eq('ativo', true);
     const { data, error } = await query;
     if (error) raise(error, 'listCustomFields');
     return (data ?? []) as CustomField[];
   },
 
-  async createCustomField(fields: Omit<CustomField, 'id' | 'created_at'>): Promise<CustomField> {
+  async createCustomField(clientId: string, fields: Omit<CustomField, 'id' | 'client_id' | 'created_at'>): Promise<CustomField> {
     const { data, error } = await supabase
       .from('custom_fields')
-      .insert(fields)
+      .insert({ ...fields, client_id: clientId })
       .select()
       .single();
     if (error) raise(error, 'createCustomField');
@@ -409,23 +445,28 @@ export const db = {
   },
 
   async updateCustomField(
+    clientId: string,
     id: number,
-    fields: Partial<Omit<CustomField, 'id' | 'created_at'>>
+    fields: Partial<Omit<CustomField, 'id' | 'client_id' | 'created_at'>>
   ): Promise<CustomField> {
     const { data, error } = await supabase
       .from('custom_fields')
       .update(fields)
       .eq('id', id)
+      .eq('client_id', clientId)
       .select()
       .single();
     if (error) raise(error, 'updateCustomField');
     return data as CustomField;
   },
 
-  async deleteCustomField(id: number): Promise<void> {
-    // Remove valores associados primeiro para não violar FK
+  async deleteCustomField(clientId: string, id: number): Promise<void> {
     await supabase.from('custom_field_values').delete().eq('field_id', id);
-    const { error } = await supabase.from('custom_fields').delete().eq('id', id);
+    const { error } = await supabase
+      .from('custom_fields')
+      .delete()
+      .eq('id', id)
+      .eq('client_id', clientId);
     if (error) raise(error, 'deleteCustomField');
   },
 
@@ -451,152 +492,57 @@ export const db = {
     if (error) raise(error, 'upsertCustomValue');
   },
 
-  // ── Integrations / API Keys ────────────────────────────────────────────────
+  // ── API Keys ───────────────────────────────────────────────────────────────
 
-  async getClientUuid(): Promise<string> {
-    const { data, error } = await supabase
-      .from('admin_config')
-      .select('client_uuid')
-      .eq('id', 1)
-      .single();
-    if (error) raise(error, 'getClientUuid');
-    return (data as { client_uuid: string }).client_uuid;
-  },
-
-  async listApiKeys(): Promise<ApiKey[]> {
+  async listApiKeys(clientId: string): Promise<ApiKey[]> {
     const { data, error } = await supabase
       .from('api_keys')
-      .select('id, nome, key_prefix, ativo, created_at, last_used_at, revoked_at')
+      .select('id, client_id, nome, key_prefix, ativo, created_at, last_used_at, revoked_at')
+      .eq('client_id', clientId)
       .order('created_at', { ascending: false });
     if (error) raise(error, 'listApiKeys');
     return (data ?? []) as ApiKey[];
   },
 
-  async createApiKey(nome: string, keyPrefix: string, keyHash: string): Promise<ApiKey> {
+  async createApiKey(clientId: string, nome: string, keyPrefix: string, keyHash: string): Promise<ApiKey> {
     const { data, error } = await supabase
       .from('api_keys')
-      .insert({ nome, key_prefix: keyPrefix, key_hash: keyHash })
-      .select('id, nome, key_prefix, ativo, created_at, last_used_at, revoked_at')
+      .insert({ client_id: clientId, nome, key_prefix: keyPrefix, key_hash: keyHash })
+      .select('id, client_id, nome, key_prefix, ativo, created_at, last_used_at, revoked_at')
       .single();
     if (error) raise(error, 'createApiKey');
     return data as ApiKey;
   },
 
-  async revokeApiKey(id: number): Promise<void> {
+  async revokeApiKey(clientId: string, id: number): Promise<void> {
     const { error } = await supabase
       .from('api_keys')
       .update({ ativo: false, revoked_at: new Date().toISOString() })
-      .eq('id', id);
+      .eq('id', id)
+      .eq('client_id', clientId);
     if (error) raise(error, 'revokeApiKey');
   },
 
-  // ── Contador ───────────────────────────────────────────────────────────────
-
-  async findContador(email: string): Promise<Contador | undefined> {
-    const { data, error } = await supabase
-      .from('contadores')
+  async validateApiKey(clientId: string, key: string): Promise<ApiKey | null> {
+    const hash = crypto.createHash('sha256').update(key).digest('hex');
+    const { data } = await supabase
+      .from('api_keys')
       .select('*')
-      .eq('email', email)
+      .eq('client_id', clientId)
+      .eq('key_hash', hash)
+      .eq('ativo', true)
+      .is('revoked_at', null)
       .maybeSingle();
-    if (error) raise(error, 'findContador');
-    return data ?? undefined;
+    if (data) {
+      supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', (data as ApiKey).id).then(() => {});
+    }
+    return (data as ApiKey | null);
   },
 
-  async findContadorById(id: number): Promise<Contador | undefined> {
-    const { data, error } = await supabase
-      .from('contadores')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-    if (error) raise(error, 'findContadorById');
-    return data ?? undefined;
-  },
+  // ── Global helpers (sem filtro de client_id) ──────────────────────────────
 
-  async updateContadorLogin(id: number): Promise<void> {
-    await supabase
-      .from('contadores')
-      .update({ last_login_at: new Date().toISOString() })
-      .eq('id', id);
-  },
-
-  async logContadorAccess(
-    contadorId: number,
-    email: string,
-    clientUuid: string | null,
-    action: string
-  ): Promise<void> {
-    await supabase.from('contador_access_logs').insert({
-      contador_id: contadorId,
-      contador_email: email,
-      client_uuid: clientUuid,
-      action,
-    });
-  },
-
-  async upsertContadorCliente(
-    contadorId: number,
-    clientUuid: string,
-    connectionType: 'uuid' | 'api_key',
-    apiKeyId: number | null,
-    nomeConexao: string
-  ): Promise<ContadorCliente> {
-    const { data, error } = await supabase
-      .from('contador_clientes')
-      .upsert(
-        {
-          contador_id: contadorId,
-          client_uuid: clientUuid,
-          connection_type: connectionType,
-          api_key_id: apiKeyId,
-          nome_conexao: nomeConexao,
-          last_accessed_at: new Date().toISOString(),
-        },
-        { onConflict: 'contador_id,client_uuid' }
-      )
-      .select()
-      .single();
-    if (error) raise(error, 'upsertContadorCliente');
-    return data as ContadorCliente;
-  },
-
-  async listContadorClientes(contadorId: number): Promise<ContadorCliente[]> {
-    const { data, error } = await supabase
-      .from('contador_clientes')
-      .select('*')
-      .eq('contador_id', contadorId)
-      .order('last_accessed_at', { ascending: false, nullsFirst: false });
-    if (error) raise(error, 'listContadorClientes');
-    return (data ?? []) as ContadorCliente[];
-  },
-
-  async getContadorCliente(contadorId: number, id: number): Promise<ContadorCliente | undefined> {
-    const { data, error } = await supabase
-      .from('contador_clientes')
-      .select('*')
-      .eq('id', id)
-      .eq('contador_id', contadorId)
-      .maybeSingle();
-    if (error) raise(error, 'getContadorCliente');
-    return data ?? undefined;
-  },
-
-  async deleteContadorCliente(contadorId: number, id: number): Promise<void> {
-    const { error } = await supabase
-      .from('contador_clientes')
-      .delete()
-      .eq('id', id)
-      .eq('contador_id', contadorId);
-    if (error) raise(error, 'deleteContadorCliente');
-  },
-
-  async updateContadorClienteAccess(id: number): Promise<void> {
-    await supabase
-      .from('contador_clientes')
-      .update({ last_accessed_at: new Date().toISOString() })
-      .eq('id', id);
-  },
-
-  async validateApiKey(key: string): Promise<ApiKey | null> {
+  /** Valida uma API key sem saber o client_id previamente (uso pelo contador). */
+  async validateApiKeyGlobal(key: string): Promise<ApiKey | null> {
     const hash = crypto.createHash('sha256').update(key).digest('hex');
     const { data } = await supabase
       .from('api_keys')
@@ -606,13 +552,83 @@ export const db = {
       .is('revoked_at', null)
       .maybeSingle();
     if (data) {
-      // Fire-and-forget: update last_used_at
-      supabase
-        .from('api_keys')
-        .update({ last_used_at: new Date().toISOString() })
-        .eq('id', (data as ApiKey).id)
-        .then(() => {});
+      supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', (data as ApiKey).id).then(() => {});
     }
     return (data as ApiKey | null);
+  },
+
+  /**
+   * Recebe o client_uuid que o admin compartilha (admin_config.client_uuid)
+   * e retorna o client_id (clients.id) correspondente, ou null se não encontrado.
+   * Usado pelo contador para conectar via UUID.
+   */
+  async findClientByAdminUuid(adminUuid: string): Promise<string | null> {
+    const { data } = await supabase
+      .from('admin_config')
+      .select('client_id')
+      .eq('client_uuid', adminUuid)
+      .maybeSingle();
+    return (data as { client_id: string } | null)?.client_id ?? null;
+  },
+
+  // ── Contador (global — não filtra por client_id) ───────────────────────────
+
+  async findContador(email: string): Promise<Contador | undefined> {
+    const { data, error } = await supabase.from('contadores').select('*').eq('email', email).maybeSingle();
+    if (error) raise(error, 'findContador');
+    return data ?? undefined;
+  },
+
+  async findContadorById(id: number): Promise<Contador | undefined> {
+    const { data, error } = await supabase.from('contadores').select('*').eq('id', id).maybeSingle();
+    if (error) raise(error, 'findContadorById');
+    return data ?? undefined;
+  },
+
+  async updateContadorLogin(id: number): Promise<void> {
+    await supabase.from('contadores').update({ last_login_at: new Date().toISOString() }).eq('id', id);
+  },
+
+  async logContadorAccess(contadorId: number, email: string, clientUuid: string | null, action: string): Promise<void> {
+    await supabase.from('contador_access_logs').insert({ contador_id: contadorId, contador_email: email, client_uuid: clientUuid, action });
+  },
+
+  async upsertContadorCliente(
+    contadorId: number, clientUuid: string, connectionType: 'uuid' | 'api_key',
+    apiKeyId: number | null, nomeConexao: string
+  ): Promise<ContadorCliente> {
+    const { data, error } = await supabase
+      .from('contador_clientes')
+      .upsert(
+        { contador_id: contadorId, client_uuid: clientUuid, connection_type: connectionType, api_key_id: apiKeyId, nome_conexao: nomeConexao, last_accessed_at: new Date().toISOString() },
+        { onConflict: 'contador_id,client_uuid' }
+      )
+      .select().single();
+    if (error) raise(error, 'upsertContadorCliente');
+    return data as ContadorCliente;
+  },
+
+  async listContadorClientes(contadorId: number): Promise<ContadorCliente[]> {
+    const { data, error } = await supabase
+      .from('contador_clientes').select('*').eq('contador_id', contadorId)
+      .order('last_accessed_at', { ascending: false, nullsFirst: false });
+    if (error) raise(error, 'listContadorClientes');
+    return (data ?? []) as ContadorCliente[];
+  },
+
+  async getContadorCliente(contadorId: number, id: number): Promise<ContadorCliente | undefined> {
+    const { data, error } = await supabase
+      .from('contador_clientes').select('*').eq('id', id).eq('contador_id', contadorId).maybeSingle();
+    if (error) raise(error, 'getContadorCliente');
+    return data ?? undefined;
+  },
+
+  async deleteContadorCliente(contadorId: number, id: number): Promise<void> {
+    const { error } = await supabase.from('contador_clientes').delete().eq('id', id).eq('contador_id', contadorId);
+    if (error) raise(error, 'deleteContadorCliente');
+  },
+
+  async updateContadorClienteAccess(id: number): Promise<void> {
+    await supabase.from('contador_clientes').update({ last_accessed_at: new Date().toISOString() }).eq('id', id);
   },
 };

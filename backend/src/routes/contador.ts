@@ -114,21 +114,22 @@ router.post('/connect', contadorAuthMiddleware, async (req: Request, res: Respon
     let connectionType: 'uuid' | 'api_key';
 
     if (chave.trim().startsWith('pd_live_')) {
-      // Validate API Key
-      const apiKey = await db.validateApiKey(chave.trim());
+      // Validate API Key globally (we don't know the client_id yet)
+      const apiKey = await db.validateApiKeyGlobal(chave.trim());
       if (!apiKey) {
         return res.status(400).json({ error: 'Chave de API inválida ou revogada.' });
       }
-      clientUuid = await db.getClientUuid();
+      clientUuid = apiKey.client_id;   // derive client from the key
       apiKeyId = apiKey.id;
       connectionType = 'api_key';
     } else {
-      // Validate UUID
-      const uuid = await db.getClientUuid();
-      if (uuid !== chave.trim()) {
+      // The chave is admin_config.client_uuid (shared by the admin on the integrations page)
+      // Resolve it to the actual client_id for tenant queries
+      const resolvedClientId = await db.findClientByAdminUuid(chave.trim());
+      if (!resolvedClientId) {
         return res.status(400).json({ error: 'UUID do cliente não encontrado.' });
       }
-      clientUuid = uuid;
+      clientUuid = resolvedClientId;
       connectionType = 'uuid';
     }
 
@@ -196,9 +197,11 @@ router.get('/relatorio', contadorAuthMiddleware, async (req: Request, res: Respo
 
     db.updateContadorClienteAccess(cliente.id).catch(() => {});
 
+    // cliente.client_uuid holds the tenant's client_id
+    const tenantId = cliente.client_uuid;
     const [registros, usuarios] = await Promise.all([
-      db.findAll(2000),
-      db.listUsuarios(),
+      db.findAll(tenantId, 2000),
+      db.listUsuarios(tenantId),
     ]);
 
     const usuariosMap = Object.fromEntries(usuarios.map((u) => [u.id, u]));

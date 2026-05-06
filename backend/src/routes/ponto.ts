@@ -1,8 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../database/db';
+import { requireTenant } from '../middleware/tenant';
 import type { Registro } from '../database/db';
 
 const router = Router();
+
+// ── Require an active tenant for every ponto route ────────────────────────────
+router.use(requireTenant);
 
 type TipoRegistro = 'hora_inicial' | 'inicio_intervalo' | 'fim_intervalo' | 'hora_final';
 
@@ -47,13 +51,14 @@ function isValidPin(pin: unknown): pin is string {
 // POST /api/ponto/registrar
 router.post('/registrar', async (req: Request, res: Response) => {
   const { pin } = req.body as { pin: unknown };
+  const clientId = req.client!.id;
 
   if (!isValidPin(pin)) {
     return res.status(400).json({ error: 'PIN inválido. Use apenas números (4-6 dígitos).' });
   }
 
   try {
-    const usuario = await db.findUsuario(pin);
+    const usuario = await db.findUsuario(clientId, pin);
     if (!usuario) {
       return res.status(404).json({ error: 'PIN não cadastrado. Solicite o cadastro ao administrador.' });
     }
@@ -66,21 +71,21 @@ router.post('/registrar', async (req: Request, res: Response) => {
     const horaDisplay = agora.split(' ')[1];        // "HH:MM:SS"
 
     // Find ongoing (incomplete) session linked to this user's UUID
-    let registro = await db.findLatestIncomplete(usuario.id);
+    let registro = await db.findLatestIncomplete(clientId, usuario.id);
     const nextStep = getNextStep(registro);
 
     let updated: Registro;
 
     if (!registro) {
       // No ongoing session — start a new one with hora_inicial; snapshot current daily hours
-      updated = await db.insertRecord(usuario.id, pin, dataHoje, {
+      updated = await db.insertRecord(clientId, usuario.id, pin, dataHoje, {
         hora_inicial: agora,
         horas_diarias: usuario.horas_diarias ?? null,
         intervalo: usuario.intervalo ?? null,
       });
     } else {
       // Continue existing session — nextStep is always non-null here
-      updated = await db.updateById(registro.id, { [nextStep!]: agora });
+      updated = await db.updateById(clientId, registro.id, { [nextStep!]: agora });
     }
 
     const tipo = nextStep ?? 'hora_inicial';
@@ -105,16 +110,17 @@ router.post('/registrar', async (req: Request, res: Response) => {
 // GET /api/ponto/hoje/:pin — returns the current ongoing session (if any)
 router.get('/hoje/:pin', async (req: Request, res: Response) => {
   const { pin } = req.params;
+  const clientId = req.client!.id;
 
   if (!isValidPin(pin)) {
     return res.status(400).json({ error: 'PIN inválido.' });
   }
 
   try {
-    const usuario2 = await db.findUsuario(pin);
-    if (!usuario2) return res.json({ registro: null, proximaEtapa: 'hora_inicial', proximaEtapaLabel: 'Entrada', cicloCompleto: false });
+    const usuario = await db.findUsuario(clientId, pin);
+    if (!usuario) return res.json({ registro: null, proximaEtapa: 'hora_inicial', proximaEtapaLabel: 'Entrada', cicloCompleto: false });
 
-    const registro = await db.findLatestIncomplete(usuario2.id);
+    const registro = await db.findLatestIncomplete(clientId, usuario.id);
     const nextStep = getNextStep(registro);
 
     return res.json({
@@ -132,15 +138,16 @@ router.get('/hoje/:pin', async (req: Request, res: Response) => {
 // GET /api/ponto/historico/:pin
 router.get('/historico/:pin', async (req: Request, res: Response) => {
   const { pin } = req.params;
+  const clientId = req.client!.id;
 
   if (!isValidPin(pin)) {
     return res.status(400).json({ error: 'PIN inválido.' });
   }
 
   try {
-    const u = await db.findUsuario(pin);
+    const u = await db.findUsuario(clientId, pin);
     if (!u) return res.json({ registros: [] });
-    const registros = (await db.findByUsuarioId(u.id)).map((r) => ({
+    const registros = (await db.findByUsuarioId(clientId, u.id)).map((r) => ({
       ...r,
       completo: isComplete(r),
     }));

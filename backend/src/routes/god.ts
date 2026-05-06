@@ -1,7 +1,6 @@
 /**
  * ╔══════════════════════════════════════════════════════════════╗
  * ║                     GOD MODE — BACKEND                      ║
- * ║  Super admin global. Todas as ações são logadas.            ║
  * ╚══════════════════════════════════════════════════════════════╝
  */
 import { Router, Request, Response, NextFunction } from 'express';
@@ -11,56 +10,33 @@ import type { GodUser } from '../types/express';
 
 const router = Router();
 
-// ── Session store: token → GodUser ────────────────────────────────────────────
+// ── Sessions ───────────────────────────────────────────────────────────────────
 const godSessions = new Map<string, GodUser>();
 
-// ── Rate limiter ───────────────────────────────────────────────────────────────
+// ── Rate limit ─────────────────────────────────────────────────────────────────
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 function checkRate(ip: string): boolean {
   const now = Date.now();
   let e = loginAttempts.get(ip);
   if (!e || now > e.resetAt) { e = { count: 0, resetAt: now + 60_000 }; loginAttempts.set(ip, e); }
-  e.count++;
-  return e.count <= 10;
+  return ++e.count <= 10;
 }
 
-// ── Password helpers (scrypt — muito mais seguro que SHA-256) ─────────────────
-function hashPassword(password: string): string {
+// ── Password (scrypt) ──────────────────────────────────────────────────────────
+function hashPassword(pw: string): string {
   const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
-  return `${salt}:${hash}`;
+  return `${salt}:${crypto.scryptSync(pw, salt, 64).toString('hex')}`;
 }
-
-function verifyPassword(password: string, stored: string): boolean {
+function verifyPassword(pw: string, stored: string): boolean {
   try {
     const [salt, hash] = stored.split(':');
-    const hashBuf = Buffer.from(hash, 'hex');
-    const derived = crypto.scryptSync(password, salt, 64);
-    return crypto.timingSafeEqual(hashBuf, derived);
+    return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), crypto.scryptSync(pw, salt, 64));
   } catch { return false; }
 }
 
-function generateToken(): string { return crypto.randomBytes(32).toString('hex'); }
-function getIp(req: Request): string {
+function generateToken() { return crypto.randomBytes(32).toString('hex'); }
+function getIp(req: Request) {
   return String(req.headers['x-forwarded-for'] || req.ip || 'unknown').replace('::ffff:', '').split(',')[0].trim();
-}
-
-// ── Audit helper ───────────────────────────────────────────────────────────────
-async function audit(
-  god: GodUser,
-  action: string,
-  opts: { targetType?: string; targetId?: string; targetLabel?: string; metadata?: object; ip?: string } = {}
-) {
-  await supabase.from('god_audit_logs').insert({
-    god_user_id: god.id,
-    god_email: god.email,
-    action,
-    target_type: opts.targetType ?? null,
-    target_id: opts.targetId ? String(opts.targetId) : null,
-    target_label: opts.targetLabel ?? null,
-    metadata: opts.metadata ?? null,
-    ip: opts.ip ?? null,
-  });
 }
 
 // ── Auth middleware ────────────────────────────────────────────────────────────
@@ -75,28 +51,21 @@ export function godAuthMiddleware(req: Request, res: Response, next: NextFunctio
 // ─────────────────────────────────────────────────────────────────────────────
 // AUTH
 // ─────────────────────────────────────────────────────────────────────────────
-
-/** POST /api/god/auth/setup — bootstrap: cria o primeiro GOD user (só funciona se não houver nenhum) */
 router.post('/auth/setup', async (req: Request, res: Response) => {
   const { email, nome, senha } = req.body as { email?: string; nome?: string; senha?: string };
   if (!email || !nome || !senha) return res.status(400).json({ error: 'email, nome e senha são obrigatórios.' });
-  if (senha.length < 10) return res.status(400).json({ error: 'Senha deve ter ao menos 10 caracteres.' });
+  if (senha.length < 6) return res.status(400).json({ error: 'Senha deve ter ao menos 6 caracteres.' });
 
   const { count } = await supabase.from('god_users').select('*', { count: 'exact', head: true });
-  if ((count ?? 0) > 0) return res.status(403).json({ error: 'Setup já realizado. Contate o GOD admin.' });
+  if ((count ?? 0) > 0) return res.status(403).json({ error: 'Setup já realizado.' });
 
-  const { data, error } = await supabase.from('god_users').insert({
-    email: email.trim().toLowerCase(),
-    nome: nome.trim(),
-    password_hash: hashPassword(senha),
-  }).select().single();
-
+  const { data, error } = await supabase.from('god_users')
+    .insert({ email: email.trim().toLowerCase(), nome: nome.trim(), password_hash: hashPassword(senha) })
+    .select().single();
   if (error) return res.status(500).json({ error: error.message });
-  console.log(`[GOD] Primeiro GOD user criado: ${email}`);
   return res.status(201).json({ ok: true, id: (data as GodUser).id });
 });
 
-/** POST /api/god/auth/login */
 router.post('/auth/login', async (req: Request, res: Response) => {
   const ip = getIp(req);
   if (!checkRate(ip)) return res.status(429).json({ error: 'Muitas tentativas. Aguarde 1 minuto.' });
@@ -104,13 +73,8 @@ router.post('/auth/login', async (req: Request, res: Response) => {
   const { email, senha } = req.body as { email?: string; senha?: string };
   if (!email || !senha) return res.status(400).json({ error: 'Email e senha obrigatórios.' });
 
-  const { data, error } = await supabase
-    .from('god_users')
-    .select('*')
-    .eq('email', email.trim().toLowerCase())
-    .eq('ativo', true)
-    .single();
-
+  const { data, error } = await supabase.from('god_users')
+    .select('*').eq('email', email.trim().toLowerCase()).eq('ativo', true).single();
   if (error || !data) return res.status(401).json({ error: 'Credenciais inválidas.' });
 
   const god = data as GodUser & { password_hash: string };
@@ -119,66 +83,57 @@ router.post('/auth/login', async (req: Request, res: Response) => {
   const token = generateToken();
   const { password_hash: _ph, ...safeGod } = god;
   godSessions.set(token, safeGod as GodUser);
-
   await supabase.from('god_users').update({ last_login: new Date().toISOString() }).eq('id', god.id);
-  await audit(safeGod as GodUser, 'auth.login', { ip });
-
   console.log(`[GOD] Login: ${email} (${ip})`);
   return res.json({ token, god: safeGod });
 });
 
-/** POST /api/god/auth/logout */
-router.post('/auth/logout', godAuthMiddleware, async (req: Request, res: Response) => {
+router.post('/auth/logout', godAuthMiddleware, (req: Request, res: Response) => {
   const token = req.headers.authorization?.replace('Bearer ', '') ?? '';
   godSessions.delete(token);
-  await audit(req.godUser!, 'auth.logout', { ip: getIp(req) });
   return res.json({ ok: true });
 });
 
-/** GET /api/god/auth/me */
-router.get('/auth/me', godAuthMiddleware, (_req: Request, res: Response) => {
-  return res.json({ god: _req.godUser });
+router.get('/auth/me', godAuthMiddleware, (req: Request, res: Response) => {
+  return res.json({ god: req.godUser });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// OVERVIEW — stats globais
+// OVERVIEW
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/overview', godAuthMiddleware, async (req: Request, res: Response) => {
+router.get('/overview', godAuthMiddleware, async (_req: Request, res: Response) => {
+  const today = new Date().toISOString().split('T')[0];
   const [
     { count: totalClients },
     { count: totalUsers },
     { count: totalRegistros },
     { count: totalGodUsers },
+    { count: registrosHoje },
+    { count: totalContadores },
   ] = await Promise.all([
     supabase.from('clients').select('*', { count: 'exact', head: true }),
     supabase.from('usuarios').select('*', { count: 'exact', head: true }).eq('ativo', true),
     supabase.from('registros').select('*', { count: 'exact', head: true }),
     supabase.from('god_users').select('*', { count: 'exact', head: true }).eq('ativo', true),
+    supabase.from('registros').select('*', { count: 'exact', head: true }).eq('data', today),
+    supabase.from('contadores').select('*', { count: 'exact', head: true }).eq('ativo', true),
   ]);
-
-  // Registros de hoje
-  const today = new Date().toISOString().split('T')[0];
-  const { count: registrosHoje } = await supabase
-    .from('registros').select('*', { count: 'exact', head: true }).eq('data', today);
-
-  await audit(req.godUser!, 'overview.view', { ip: getIp(req) });
-
   return res.json({
     totalClients: totalClients ?? 0,
     totalUsers: totalUsers ?? 0,
     totalRegistros: totalRegistros ?? 0,
     registrosHoje: registrosHoje ?? 0,
     totalGodUsers: totalGodUsers ?? 0,
+    totalContadores: totalContadores ?? 0,
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CLIENTS
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/clients', godAuthMiddleware, async (req: Request, res: Response) => {
+router.get('/clients', godAuthMiddleware, async (_req: Request, res: Response) => {
   const { data, error } = await supabase.from('clients').select('*').order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
-  await audit(req.godUser!, 'client.list', { ip: getIp(req) });
   return res.json(data);
 });
 
@@ -186,109 +141,175 @@ router.post('/clients', godAuthMiddleware, async (req: Request, res: Response) =
   const { subdomain, nome } = req.body as { subdomain?: string; nome?: string };
   if (!subdomain || !nome) return res.status(400).json({ error: 'subdomain e nome são obrigatórios.' });
   if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(subdomain))
-    return res.status(400).json({ error: 'Subdomínio inválido. Use apenas letras minúsculas, números e hífen.' });
+    return res.status(400).json({ error: 'Subdomínio inválido.' });
 
   const { data, error } = await supabase.from('clients').insert({ subdomain, nome }).select().single();
   if (error) return res.status(400).json({ error: error.message });
-
-  await audit(req.godUser!, 'client.create', { targetType: 'client', targetId: (data as { id: string }).id, targetLabel: nome, ip: getIp(req) });
   return res.status(201).json(data);
 });
 
 router.patch('/clients/:id', godAuthMiddleware, async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { nome, ativo } = req.body as { nome?: string; ativo?: boolean };
+  const { nome, subdomain, ativo } = req.body as { nome?: string; subdomain?: string; ativo?: boolean };
   const updates: Record<string, unknown> = {};
   if (nome !== undefined) updates.nome = nome;
   if (ativo !== undefined) updates.ativo = ativo;
+  if (subdomain !== undefined) {
+    if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(subdomain))
+      return res.status(400).json({ error: 'Subdomínio inválido.' });
+    updates.subdomain = subdomain;
+  }
   if (!Object.keys(updates).length) return res.status(400).json({ error: 'Nada para atualizar.' });
 
   const { data, error } = await supabase.from('clients').update(updates).eq('id', id).select().single();
   if (error) return res.status(400).json({ error: error.message });
-
-  await audit(req.godUser!, 'client.update', { targetType: 'client', targetId: id, targetLabel: (data as { nome: string }).nome, metadata: updates, ip: getIp(req) });
   return res.json(data);
 });
 
 router.delete('/clients/:id', godAuthMiddleware, async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { data: client } = await supabase.from('clients').select('nome,subdomain').eq('id', id).single();
-  const { error } = await supabase.from('clients').delete().eq('id', id);
+  const { error } = await supabase.from('clients').delete().eq('id', req.params.id);
   if (error) return res.status(400).json({ error: error.message });
-
-  await audit(req.godUser!, 'client.delete', {
-    targetType: 'client', targetId: id,
-    targetLabel: (client as { nome: string } | null)?.nome ?? id,
-    ip: getIp(req),
-  });
   return res.json({ ok: true });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// USERS — visão global de todos os usuários
+// USERS — visão global
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/users', godAuthMiddleware, async (req: Request, res: Response) => {
-  const { search, ativo } = req.query as { search?: string; ativo?: string };
+  const { search, ativo, created_after, created_before } = req.query as Record<string, string>;
   let query = supabase.from('usuarios').select('*').order('nome');
   if (search) query = query.ilike('nome', `%${search}%`);
-  if (ativo !== undefined) query = query.eq('ativo', ativo === 'true');
+  if (ativo !== undefined && ativo !== '') query = query.eq('ativo', ativo === 'true');
+  if (created_after) query = query.gte('created_at', created_after);
+  if (created_before) query = query.lte('created_at', created_before + 'T23:59:59');
 
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
-  await audit(req.godUser!, 'user.list', { ip: getIp(req) });
   return res.json(data);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AUDIT LOG
+// RELATÓRIOS GLOBAIS
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/audit', godAuthMiddleware, async (req: Request, res: Response) => {
-  const limit = Math.min(Number(req.query.limit ?? 100), 500);
-  const offset = Number(req.query.offset ?? 0);
+router.get('/registros', godAuthMiddleware, async (req: Request, res: Response) => {
+  const {
+    data_ini, data_fim, user_id, search,
+    page = '1', per_page = '50', format,
+  } = req.query as Record<string, string>;
 
-  const { data, error, count } = await supabase
-    .from('god_audit_logs')
-    .select('*', { count: 'exact' })
-    .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1);
+  const limit = Math.min(parseInt(per_page) || 50, 200);
+  const offset = (Math.max(parseInt(page) || 1, 1) - 1) * limit;
 
+  // Busca registros + nome do usuário
+  let query = supabase
+    .from('registros')
+    .select('*, usuarios(id, nome, pin)', { count: 'exact' })
+    .order('data', { ascending: false })
+    .order('hora_inicial', { ascending: false });
+
+  if (data_ini) query = query.gte('data', data_ini);
+  if (data_fim) query = query.lte('data', data_fim);
+  if (user_id) query = query.eq('usuario_id', user_id);
+  if (search) {
+    // Filtra por nome via join — limitação: Supabase não suporta ilike em join direto
+    // Resolvemos filtrando após a query quando search está presente
+  }
+
+  if (format !== 'csv') query = query.range(offset, offset + limit - 1);
+
+  const { data, error, count } = await query;
   if (error) return res.status(500).json({ error: error.message });
-  return res.json({ logs: data, total: count ?? 0 });
+
+  type RegistroRow = {
+    id: number; usuario_id: string; data: string;
+    hora_inicial: string | null; inicio_intervalo: string | null;
+    fim_intervalo: string | null; hora_final: string | null;
+    horas_diarias: number | null; extra: boolean | null; oculto: boolean;
+    usuarios: { id: string; nome: string; pin: string } | null;
+  };
+
+  let rows = (data ?? []) as RegistroRow[];
+
+  // Filtro de nome pós-query
+  if (search) {
+    const term = search.toLowerCase();
+    rows = rows.filter(r => r.usuarios?.nome?.toLowerCase().includes(term));
+  }
+
+  if (format === 'csv') {
+    const header = 'Data,Usuario,PIN,Entrada,Ini.Intervalo,Fim.Intervalo,Saida,Horas,Extra\n';
+    const lines = rows.map(r =>
+      [
+        r.data,
+        r.usuarios?.nome ?? '',
+        r.usuarios?.pin ?? '',
+        r.hora_inicial ?? '',
+        r.inicio_intervalo ?? '',
+        r.fim_intervalo ?? '',
+        r.hora_final ?? '',
+        r.horas_diarias != null ? (r.horas_diarias / 60).toFixed(2) : '',
+        r.extra ? 'Sim' : 'Não',
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
+    ).join('\n');
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="registros-god.csv"');
+    return res.send('﻿' + header + lines); // BOM para Excel
+  }
+
+  return res.json({ registros: rows, total: count ?? rows.length, page: parseInt(page), per_page: limit });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// IMPERSONATION — token temporário para entrar como cliente
+// CONTADORES — CRUD completo
 // ─────────────────────────────────────────────────────────────────────────────
-// Armazena tokens de impersonação: token → { clientId, godUserId, expiresAt }
-const impersonationTokens = new Map<string, { clientId: string; godId: string; expiresAt: number }>();
+router.get('/contadores', godAuthMiddleware, async (req: Request, res: Response) => {
+  const { search, ativo } = req.query as Record<string, string>;
+  let query = supabase.from('contadores').select('id, email, nome, ativo, created_at').order('nome');
+  if (search) query = query.or(`nome.ilike.%${search}%,email.ilike.%${search}%`);
+  if (ativo !== undefined && ativo !== '') query = query.eq('ativo', ativo === 'true');
 
-router.post('/impersonate/:clientId', godAuthMiddleware, async (req: Request, res: Response) => {
-  const { clientId } = req.params;
-  const { data: client, error } = await supabase.from('clients').select('*').eq('id', clientId).single();
-  if (error || !client) return res.status(404).json({ error: 'Cliente não encontrado.' });
-
-  const token = generateToken();
-  impersonationTokens.set(token, {
-    clientId,
-    godId: req.godUser!.id,
-    expiresAt: Date.now() + 30 * 60_000, // 30 minutos
-  });
-
-  await audit(req.godUser!, 'impersonation.start', {
-    targetType: 'client', targetId: clientId,
-    targetLabel: (client as { nome: string }).nome, ip: getIp(req),
-  });
-
-  console.log(`[GOD] ${req.godUser!.email} iniciou impersonação do cliente ${(client as { subdomain: string }).subdomain}`);
-  return res.json({ token, client, expiresInMinutes: 30 });
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json(data);
 });
 
-// Valida token de impersonação (chamado pelo middleware de admin)
-export function validateImpersonationToken(token: string): string | null {
-  const entry = impersonationTokens.get(token);
-  if (!entry) return null;
-  if (Date.now() > entry.expiresAt) { impersonationTokens.delete(token); return null; }
-  return entry.clientId;
-}
+router.post('/contadores', godAuthMiddleware, async (req: Request, res: Response) => {
+  const { email, nome, senha } = req.body as { email?: string; nome?: string; senha?: string };
+  if (!email || !nome || !senha) return res.status(400).json({ error: 'email, nome e senha são obrigatórios.' });
+
+  // Usa o mesmo hash do sistema de contadores (SHA-256) para compatibilidade
+  const password_hash = crypto.createHash('sha256').update(senha).digest('hex');
+  const { data, error } = await supabase
+    .from('contadores')
+    .insert({ email: email.trim().toLowerCase(), nome: nome.trim(), password_hash, ativo: true })
+    .select('id, email, nome, ativo, created_at')
+    .single();
+  if (error) return res.status(400).json({ error: error.message });
+  return res.status(201).json(data);
+});
+
+router.patch('/contadores/:id', godAuthMiddleware, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { email, nome, ativo, senha } = req.body as { email?: string; nome?: string; ativo?: boolean; senha?: string };
+  const updates: Record<string, unknown> = {};
+  if (email !== undefined) updates.email = email.trim().toLowerCase();
+  if (nome !== undefined) updates.nome = nome.trim();
+  if (ativo !== undefined) updates.ativo = ativo;
+  if (senha) updates.password_hash = crypto.createHash('sha256').update(senha).digest('hex');
+  if (!Object.keys(updates).length) return res.status(400).json({ error: 'Nada para atualizar.' });
+
+  const { data, error } = await supabase
+    .from('contadores').update(updates).eq('id', id)
+    .select('id, email, nome, ativo, created_at').single();
+  if (error) return res.status(400).json({ error: error.message });
+  return res.json(data);
+});
+
+router.delete('/contadores/:id', godAuthMiddleware, async (req: Request, res: Response) => {
+  const { error } = await supabase.from('contadores').delete().eq('id', req.params.id);
+  if (error) return res.status(400).json({ error: error.message });
+  return res.json({ ok: true });
+});
 
 export default router;

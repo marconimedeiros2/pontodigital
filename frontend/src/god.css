@@ -473,6 +473,23 @@
   font-size: 0.87rem;
 }
 
+/* ── Input size variant ─────────────────────────────────── */
+.god-input--sm {
+  padding: 7px 10px;
+  font-size: 0.83rem;
+  width: auto;
+  min-width: 0;
+}
+
+/* ── Filters row ────────────────────────────────────────── */
+.god-filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
 /* ── Responsive ─────────────────────────────────────────── */
 @media (max-width: 640px) {
   .god-main { padding: 16px; }
@@ -480,4 +497,6 @@
   .god-tabs { padding: 0 16px; }
   .god-stats-grid { grid-template-columns: repeat(2, 1fr); }
   .god-search { width: 100%; }
+  .god-filters-row { flex-direction: column; align-items: stretch; }
+  .god-input--sm { width: 100%; }
 }

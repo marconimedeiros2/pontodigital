@@ -9,6 +9,8 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { PinStatusDrawer } from './components/PinStatusDrawer';
 import { ContadorLogin } from './components/ContadorLogin';
 import { ContadorDashboard } from './components/ContadorDashboard';
+import GodApp from './components/GodApp';
+import { getSubdomain } from './utils/tenant';
 import { api } from './services/api';
 import { adminApi } from './services/adminApi';
 import { contadorApi } from './services/contadorApi';
@@ -16,6 +18,8 @@ import type { View, TipoRegistro, Registro, RegistroResponse, HojeResponse } fro
 import { STEP_LABELS } from './types';
 
 export default function App() {
+  // Subdomínio "god" → renderiza o painel GOD isolado, sem misturar com o app normal
+  if (getSubdomain() === 'god') return <GodApp />;
   const [view, setView] = useState<View>(() => {
     if (adminApi.hasToken()) return 'admin';
     if (contadorApi.hasToken()) return 'contador';

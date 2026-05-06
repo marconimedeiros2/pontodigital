@@ -53,9 +53,10 @@ export async function tenantMiddleware(
   req.client = null;
 
   // Sem subdomínio → domínio raiz (admin / marketing), segue normal
-  if (!sub) {
-    return next();
-  }
+  if (!sub) return next();
+
+  // Subdomínio reservado — GOD: não é tenant, não busca no banco
+  if (sub === 'god') return next();
 
   // Validação de segurança: bloqueia subdomínios com caracteres perigosos
   if (!SUBDOMAIN_RE.test(sub)) {

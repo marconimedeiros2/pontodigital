@@ -4,6 +4,7 @@ import App from './App.tsx';
 import './index.css';
 import './admin.css';
 import './contador.css';
+import './god.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

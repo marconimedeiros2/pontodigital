@@ -6,14 +6,22 @@ export interface TenantClient {
   nome: string;
   ativo: boolean;
   created_at: string;
-  [key: string]: unknown; // campos extras do banco
+  [key: string]: unknown;
+}
+
+export interface GodUser {
+  id: string;
+  email: string;
+  nome: string;
+  ativo: boolean;
+  last_login: string | null;
+  created_at: string;
 }
 
 declare module 'express-serve-static-core' {
   interface Request {
-    /** Cliente detectado pelo subdomínio. null = domínio raiz (sem tenant). */
     client: TenantClient | null;
-    /** Subdomínio extraído da requisição (ex: "zico"). */
     subdomain: string | null;
+    godUser: GodUser | null;
   }
 }

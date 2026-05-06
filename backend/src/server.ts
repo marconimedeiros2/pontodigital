@@ -6,6 +6,7 @@ import pontoRoutes from './routes/ponto';
 import adminRoutes from './routes/admin';
 import contadorRoutes from './routes/contador';
 import { tenantMiddleware } from './middleware/tenant';
+import godRoutes from './routes/god';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -41,6 +42,7 @@ app.use('/api', (req, _res, next) => {
 app.use('/api/ponto', pontoRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/contador', contadorRoutes);
+app.use('/api/god', godRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {

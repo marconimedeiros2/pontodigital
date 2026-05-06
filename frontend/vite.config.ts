@@ -12,4 +12,6 @@ export default defineConfig({
       },
     },
   },
+  // Garante que /god/* seja tratado pelo React (SPA fallback)
+  appType: 'spa',
 });

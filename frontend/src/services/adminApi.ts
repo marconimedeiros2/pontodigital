@@ -1,3 +1,5 @@
+import { getSubdomain } from '../utils/tenant';
+
 const BASE = '/api/admin';
 
 function getToken(): string | null {
@@ -6,7 +8,11 @@ function getToken(): string | null {
 
 function authHeaders(): Record<string, string> {
   const token = getToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  const sub = getSubdomain();
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(sub   ? { 'X-Tenant': sub }                  : {}),
+  };
 }
 
 async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
@@ -16,8 +22,9 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
   });
   const data = await res.json();
   if (!res.ok) {
-    // Session expired / invalid token → force re-login
-    if (res.status === 401) {
+    // 401 numa requisição autenticada = sessão expirada → recarregar
+    // 401 no login (sem token) = senha errada → mostrar erro normalmente
+    if (res.status === 401 && getToken()) {
       sessionStorage.removeItem('admin_token');
       window.location.reload();
     }

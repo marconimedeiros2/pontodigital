@@ -46,11 +46,21 @@ export async function tenantMiddleware(
   res: Response,
   next: NextFunction,
 ): Promise<void> {
-  // req.hostname usa X-Forwarded-Host automaticamente quando trust proxy está ativo.
-  // Fallback explícito garante funcionar mesmo com versões antigas do Express/nginx.
+  // Resolve hostname: X-Forwarded-Host (nginx) > req.hostname > Host header
   const forwardedHost = (req.headers['x-forwarded-host'] as string | undefined)
     ?.split(',')[0]?.trim();
-  const hostname = forwardedHost ?? req.hostname ?? req.headers.host ?? '';
+  const rawHost = forwardedHost ?? req.hostname ?? (req.headers.host as string) ?? '';
+  const bareHost = rawHost.split(':')[0].toLowerCase();
+
+  // Em dev (localhost), o frontend envia X-Tenant com o subdomain escolhido.
+  // Em produção usamos apenas o hostname real — X-Tenant é ignorado por segurança.
+  const isLocalDev = bareHost === 'localhost' || bareHost === '127.0.0.1';
+  const xTenant = isLocalDev
+    ? (req.headers['x-tenant'] as string | undefined)?.trim().toLowerCase()
+    : undefined;
+
+  // Se veio X-Tenant em dev, monta hostname sintético para reusar extractSubdomain
+  const hostname = xTenant ? `${xTenant}.${BASE_DOMAIN}` : rawHost;
   const sub = extractSubdomain(hostname);
 
   req.subdomain = sub;

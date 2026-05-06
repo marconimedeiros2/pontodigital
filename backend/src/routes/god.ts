@@ -325,4 +325,42 @@ router.delete('/contadores/:id', godAuthMiddleware, async (req: Request, res: Re
   return res.json({ ok: true });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SETTINGS — senha global de admin
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.get('/settings', godAuthMiddleware, async (_req: Request, res: Response) => {
+  const { data, error } = await supabase
+    .from('god_settings').select('global_admin_password_hash, updated_at').eq('id', 1).single();
+  if (error) return res.status(500).json({ error: error.message });
+  const row = data as { global_admin_password_hash: string; updated_at: string };
+  return res.json({
+    hasGlobalPassword: row.global_admin_password_hash.length > 0,
+    updated_at: row.updated_at,
+  });
+});
+
+router.put('/settings/senha-global', godAuthMiddleware, async (req: Request, res: Response) => {
+  const { senha } = req.body as { senha?: string };
+  if (!senha || senha.length < 4) {
+    return res.status(400).json({ error: 'Senha deve ter ao menos 4 caracteres.' });
+  }
+  const hash = crypto.createHash('sha256').update(senha).digest('hex');
+  const { error } = await supabase
+    .from('god_settings')
+    .update({ global_admin_password_hash: hash, updated_at: new Date().toISOString() })
+    .eq('id', 1);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ ok: true });
+});
+
+router.delete('/settings/senha-global', godAuthMiddleware, async (_req: Request, res: Response) => {
+  const { error } = await supabase
+    .from('god_settings')
+    .update({ global_admin_password_hash: '', updated_at: new Date().toISOString() })
+    .eq('id', 1);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ ok: true });
+});
+
 export default router;

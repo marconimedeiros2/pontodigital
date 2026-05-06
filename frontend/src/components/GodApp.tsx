@@ -628,8 +628,150 @@ function ContadoresTab() {
   );
 }
 
+// ── CONFIGURAÇÕES ─────────────────────────────────────────────────────────────
+function ConfiguracoesTab() {
+  const [hasGlobal, setHasGlobal]   = useState<boolean | null>(null);
+  const [updatedAt, setUpdatedAt]   = useState<string | null>(null);
+  const [novaSenha, setNovaSenha]   = useState('');
+  const [confirma, setConfirma]     = useState('');
+  const [showPwd, setShowPwd]       = useState(false);
+  const [saving, setSaving]         = useState(false);
+  const [removing, setRemoving]     = useState(false);
+  const [msg, setMsg]               = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const d = await api<{ hasGlobalPassword: boolean; updated_at: string }>('/settings');
+      setHasGlobal(d.hasGlobalPassword);
+      setUpdatedAt(d.updated_at);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault(); setMsg(null);
+    if (novaSenha !== confirma) { setMsg({ type: 'err', text: 'As senhas não coincidem.' }); return; }
+    if (novaSenha.length < 4)  { setMsg({ type: 'err', text: 'Senha deve ter ao menos 4 caracteres.' }); return; }
+    setSaving(true);
+    try {
+      await api('/settings/senha-global', { method: 'PUT', body: JSON.stringify({ senha: novaSenha }) });
+      setNovaSenha(''); setConfirma('');
+      setMsg({ type: 'ok', text: 'Senha global definida com sucesso.' });
+      await load();
+    } catch (err: unknown) { setMsg({ type: 'err', text: err instanceof Error ? err.message : 'Erro' }); }
+    finally { setSaving(false); }
+  }
+
+  async function handleRemove() {
+    if (!confirm('Remover a senha global? Cada empresa voltará a usar sua própria senha.')) return;
+    setRemoving(true); setMsg(null);
+    try {
+      await api('/settings/senha-global', { method: 'DELETE' });
+      setMsg({ type: 'ok', text: 'Senha global removida.' });
+      await load();
+    } catch (err: unknown) { setMsg({ type: 'err', text: err instanceof Error ? err.message : 'Erro' }); }
+    finally { setRemoving(false); }
+  }
+
+  return (
+    <div style={{ maxWidth: 520 }}>
+      <div className="god-section-header">
+        <span className="god-section-title">⚙️ Configurações do Sistema</span>
+      </div>
+
+      {/* Card: senha global de admin */}
+      <div className="god-card">
+        <div className="god-card-body">
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ fontWeight: 700, color: 'var(--god-text)', marginBottom: 6 }}>
+              Senha global de admin
+            </div>
+            <div style={{ fontSize: '0.84rem', color: 'var(--god-muted)', lineHeight: 1.5 }}>
+              Quando definida, esta senha funciona no painel admin de <strong style={{ color: 'var(--god-accent)' }}>todos os subdomínios</strong>,
+              independente da senha individual de cada empresa.
+            </div>
+          </div>
+
+          {/* Status */}
+          {hasGlobal !== null && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, padding: '10px 14px', background: 'var(--god-bg)', borderRadius: 8, border: '1px solid var(--god-border)' }}>
+              <span style={{ fontSize: '1.1rem' }}>{hasGlobal ? '🔒' : '🔓'}</span>
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: hasGlobal ? 'var(--god-success)' : 'var(--god-warning)' }}>
+                  {hasGlobal ? 'Senha global ativa' : 'Nenhuma senha global definida'}
+                </div>
+                {updatedAt && hasGlobal && (
+                  <div style={{ fontSize: '0.75rem', color: 'var(--god-muted)' }}>
+                    Atualizada em {new Date(updatedAt).toLocaleString('pt-BR')}
+                  </div>
+                )}
+              </div>
+              {hasGlobal && (
+                <button
+                  className="god-btn-sm god-btn-sm--danger"
+                  style={{ marginLeft: 'auto' }}
+                  onClick={handleRemove}
+                  disabled={removing}
+                >
+                  {removing ? 'Removendo…' : '🗑 Remover'}
+                </button>
+              )}
+            </div>
+          )}
+
+          {msg && (
+            <div className={msg.type === 'ok' ? undefined : 'god-error'} style={msg.type === 'ok' ? {
+              background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)',
+              color: 'var(--god-success)', borderRadius: 8, padding: '10px 14px',
+              fontSize: '0.85rem', marginBottom: 14,
+            } : { marginBottom: 14 }}>
+              {msg.text}
+            </div>
+          )}
+
+          <form onSubmit={handleSave}>
+            <div className="god-form-group">
+              <label className="god-label">{hasGlobal ? 'Nova senha global' : 'Definir senha global'}</label>
+              <div className="god-input-wrap">
+                <input
+                  className="god-input"
+                  type={showPwd ? 'text' : 'password'}
+                  value={novaSenha}
+                  onChange={e => setNovaSenha(e.target.value)}
+                  required
+                  placeholder="Mínimo 4 caracteres"
+                  autoComplete="new-password"
+                />
+                <button type="button" className="god-eye-btn" onClick={() => setShowPwd(v => !v)}>
+                  {showPwd ? <IconEyeOff /> : <IconEye />}
+                </button>
+              </div>
+            </div>
+            <div className="god-form-group">
+              <label className="god-label">Confirmar senha</label>
+              <input
+                className="god-input"
+                type={showPwd ? 'text' : 'password'}
+                value={confirma}
+                onChange={e => setConfirma(e.target.value)}
+                required
+                placeholder="Repita a senha"
+                autoComplete="new-password"
+              />
+            </div>
+            <button className="god-btn" type="submit" disabled={saving} style={{ marginTop: 4 }}>
+              {saving ? 'Salvando…' : hasGlobal ? '🔑 Atualizar senha global' : '🔑 Definir senha global'}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── DASHBOARD LAYOUT ──────────────────────────────────────────────────────────
-type Tab = 'overview' | 'clients' | 'users' | 'relatorios' | 'contadores';
+type Tab = 'overview' | 'clients' | 'users' | 'relatorios' | 'contadores' | 'configuracoes';
 
 function GodDashboard({ god, onLogout }: { god: GodUser; onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>('overview');
@@ -640,11 +782,12 @@ function GodDashboard({ god, onLogout }: { god: GodUser; onLogout: () => void })
   }
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'overview',   label: '📊 Visão Geral' },
-    { id: 'clients',    label: '🏢 Clientes' },
-    { id: 'users',      label: '👤 Usuários' },
-    { id: 'relatorios', label: '📋 Relatórios' },
-    { id: 'contadores', label: '🧮 Contadores' },
+    { id: 'overview',      label: '📊 Visão Geral' },
+    { id: 'clients',       label: '🏢 Clientes' },
+    { id: 'users',         label: '👤 Usuários' },
+    { id: 'relatorios',    label: '📋 Relatórios' },
+    { id: 'contadores',    label: '🧮 Contadores' },
+    { id: 'configuracoes', label: '⚙️ Configurações' },
   ];
 
   return (
@@ -669,11 +812,12 @@ function GodDashboard({ god, onLogout }: { god: GodUser; onLogout: () => void })
         </nav>
 
         <main className="god-main">
-          {tab === 'overview'   && <OverviewTab />}
-          {tab === 'clients'    && <ClientsTab />}
-          {tab === 'users'      && <UsersTab />}
-          {tab === 'relatorios' && <RelatoriosTab />}
-          {tab === 'contadores' && <ContadoresTab />}
+          {tab === 'overview'      && <OverviewTab />}
+          {tab === 'clients'       && <ClientsTab />}
+          {tab === 'users'         && <UsersTab />}
+          {tab === 'relatorios'    && <RelatoriosTab />}
+          {tab === 'contadores'    && <ContadoresTab />}
+          {tab === 'configuracoes' && <ConfiguracoesTab />}
         </main>
       </div>
     </div>

@@ -1,10 +1,16 @@
 import type { RegistroResponse, HojeResponse, HistoricoResponse } from '../types';
+import { getSubdomain } from '../utils/tenant';
 
 const BASE = '/api/ponto';
 
+function tenantHeaders(): Record<string, string> {
+  const sub = getSubdomain();
+  return sub ? { 'X-Tenant': sub } : {};
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...tenantHeaders() },
     ...options,
   });
   

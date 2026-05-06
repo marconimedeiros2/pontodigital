@@ -354,13 +354,27 @@ export const db = {
   // ── Admin auth + config ────────────────────────────────────────────────────
 
   async checkPassword(clientId: string, password: string): Promise<boolean> {
-    const { data, error } = await supabase
+    const hash = hashPassword(password);
+
+    // Verifica senha específica do tenant
+    const { data: tenantData } = await supabase
       .from('admin_config')
       .select('password_hash')
       .eq('client_id', clientId)
       .maybeSingle();
-    if (error || !data) return false;
-    return (data as { password_hash: string }).password_hash === hashPassword(password);
+    if (tenantData && (tenantData as { password_hash: string }).password_hash === hash) {
+      return true;
+    }
+
+    // Fallback: senha global configurada no GOD cockpit
+    const { data: godData } = await supabase
+      .from('god_settings')
+      .select('global_admin_password_hash')
+      .eq('id', 1)
+      .maybeSingle();
+    const globalHash = (godData as { global_admin_password_hash: string } | null)
+      ?.global_admin_password_hash ?? '';
+    return globalHash.length > 0 && globalHash === hash;
   },
 
   async changePassword(clientId: string, newPassword: string): Promise<void> {

@@ -11,6 +11,9 @@ import godRoutes from './routes/god';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Necessário para que req.hostname reflita o Host original quando atrás de nginx/proxy
+app.set('trust proxy', true);
+
 // CORS — aceita qualquer subdomínio de flowbase.tech
 const BASE_DOMAIN = process.env.BASE_DOMAIN || 'flowbase.tech';
 app.use(cors({

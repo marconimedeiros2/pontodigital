@@ -8,19 +8,20 @@ const router = Router();
 // ── Require an active tenant for every admin route ────────────────────────────
 router.use(requireTenant);
 
-const sessions = new Set<string>();
+// token → clientId: garante que um token só funciona no tenant onde foi criado
+const sessions = new Map<string, string>();
 
 function generateToken(): string {
   return crypto.randomBytes(32).toString('hex');
 }
 
-function isValidToken(token: string): boolean {
-  return sessions.has(token);
+function isValidToken(token: string, clientId: string): boolean {
+  return sessions.get(token) === clientId;
 }
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token || !isValidToken(token)) {
+  if (!token || !isValidToken(token, req.client?.id ?? '')) {
     res.status(401).json({ error: 'Não autorizado.' });
     return;
   }
@@ -43,7 +44,7 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     const token = generateToken();
-    sessions.add(token);
+    sessions.set(token, clientId);
     return res.json({ token });
   } catch (err) {
     console.error('[POST /login]', err);

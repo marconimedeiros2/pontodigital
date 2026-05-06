@@ -46,7 +46,11 @@ export async function tenantMiddleware(
   res: Response,
   next: NextFunction,
 ): Promise<void> {
-  const hostname = req.hostname ?? req.headers.host ?? '';
+  // req.hostname usa X-Forwarded-Host automaticamente quando trust proxy está ativo.
+  // Fallback explícito garante funcionar mesmo com versões antigas do Express/nginx.
+  const forwardedHost = (req.headers['x-forwarded-host'] as string | undefined)
+    ?.split(',')[0]?.trim();
+  const hostname = forwardedHost ?? req.hostname ?? req.headers.host ?? '';
   const sub = extractSubdomain(hostname);
 
   req.subdomain = sub;

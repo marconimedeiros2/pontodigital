@@ -9,7 +9,7 @@ const BASE_DOMAIN = import.meta.env.VITE_BASE_DOMAIN || 'flowbase.tech';
 export function getSubdomain(): string | null {
   const host = window.location.hostname.toLowerCase();
 
-  // Dev local: suporte via path (/god) ou query param (?__tenant=god)
+  // Dev local: suporte via path (/god), query param (?__tenant=) ou VITE_DEFAULT_TENANT
   if (host === 'localhost' || host === '127.0.0.1') {
     const params = new URLSearchParams(window.location.search);
     const qTenant = params.get('__tenant');
@@ -17,6 +17,10 @@ export function getSubdomain(): string | null {
 
     const pathSeg = window.location.pathname.split('/')[1];
     if (pathSeg === 'god') return 'god';
+
+    // Fallback: tenant padrão configurado no .env (VITE_DEFAULT_TENANT=zico)
+    const defaultTenant = import.meta.env.VITE_DEFAULT_TENANT as string | undefined;
+    if (defaultTenant) return defaultTenant;
 
     return null;
   }

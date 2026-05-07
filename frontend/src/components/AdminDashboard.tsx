@@ -2053,9 +2053,9 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               // Barra de presença
               const total = stats.total || 1;
               const barSegments = [
-                { pct: Math.round((stats.presentes / total) * 100), color: 'var(--status-success)', label: 'Presentes' },
-                { pct: Math.round((stats.emIntervalo / total) * 100), color: 'var(--status-warning)', label: 'Intervalo' },
-                { pct: Math.round((stats.saiu / total) * 100), color: 'var(--status-danger)', label: 'Saíram' },
+                { pct: Math.round((stats.presentes / total) * 100), color: '#FF6B35', label: 'Presentes' },
+                { pct: Math.round((stats.emIntervalo / total) * 100), color: '#FF9033', label: 'Intervalo' },
+                { pct: Math.round((stats.saiu / total) * 100), color: '#E5521C', label: 'Saíram' },
               ];
 
               return (
@@ -2063,17 +2063,17 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   {/* ── Stat cards ── */}
                   <div className="stats-grid dash-stats-grid">
                     {([
-                      { label: 'Total do Dia', value: stats.total, accent: '#4a6cf7',
+                      { label: 'Total do Dia', value: stats.total, accent: '#FF6B35',
                         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
-                      { label: 'Presentes', value: stats.presentes, accent: '#3b82f6',
+                      { label: 'Presentes', value: stats.presentes, accent: '#FF6B35',
                         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
-                      { label: 'Em Intervalo', value: stats.emIntervalo, accent: '#6366f1',
+                      { label: 'Em Intervalo', value: stats.emIntervalo, accent: '#FF9033',
                         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
-                      { label: 'Saíram', value: stats.saiu, accent: '#818cf8',
+                      { label: 'Saíram', value: stats.saiu, accent: '#E5521C',
                         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> },
-                      { label: 'Dia Completo', value: stats.completos, accent: '#2563eb',
+                      { label: 'Dia Completo', value: stats.completos, accent: '#FF6B35',
                         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg> },
-                      { label: 'Ausentes', value: ausentesCount, accent: '#93c5fd',
+                      { label: 'Ausentes', value: ausentesCount, accent: '#FF6B35',
                         icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="7" r="4"/><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><line x1="4" y1="4" x2="20" y2="20"/></svg> },
                     ] as { label: string; value: number; accent: string; icon: React.ReactNode }[]).map((s) => (
                       <div key={s.label} className="stat-card dash-stat-card" style={{ '--sc-accent': s.accent } as React.CSSProperties}>

@@ -174,8 +174,8 @@
 .cnt-sidebar {
   width: 240px;
   flex-shrink: 0;
-  background: var(--bg-header);
-  border-right: 1px solid rgba(255,255,255,0.06);
+  background: #ffffff;
+  border-right: 1px solid #e8e8e8;
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
@@ -189,19 +189,19 @@
   align-items: center;
   gap: 12px;
   padding: 24px 20px 22px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  border-bottom: 1px solid #e8e8e8;
 }
 
 .cnt-sidebar-brand-icon {
   width: 40px;
   height: 40px;
-  background: rgba(255,255,255,0.1);
-  border: 1px solid rgba(255,255,255,0.12);
+  background: var(--primary-light);
+  border: 1px solid var(--border);
   border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: var(--primary);
   flex-shrink: 0;
 }
 
@@ -214,15 +214,15 @@
 .cnt-sidebar-brand-name {
   font-size: 0.98rem;
   font-weight: 800;
-  color: white;
+  color: var(--text);
   line-height: 1;
   letter-spacing: -0.01em;
 }
 
 .cnt-sidebar-brand-sub {
   font-size: 0.7rem;
-  color: rgba(255,255,255,0.4);
-  font-weight: 500;
+  color: var(--primary);
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -230,11 +230,11 @@
 /* User info */
 .cnt-sidebar-user {
   padding: 14px 20px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  border-bottom: 1px solid #e8e8e8;
 }
 .cnt-sidebar-user-label {
   font-size: 0.7rem;
-  color: rgba(255,255,255,0.35);
+  color: var(--text-muted);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -243,7 +243,7 @@
 .cnt-sidebar-user-name {
   font-size: 0.875rem;
   font-weight: 600;
-  color: rgba(255,255,255,0.9);
+  color: var(--text);
 }
 
 /* Section label */
@@ -252,14 +252,14 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: rgba(255,255,255,0.35);
+  color: var(--text-muted);
   padding: 14px 20px 6px;
 }
 
 .cnt-sidebar-loading,
 .cnt-sidebar-empty {
   font-size: 13px;
-  color: rgba(255,255,255,0.35);
+  color: var(--text-muted);
   padding: 8px 20px;
 }
 
@@ -285,11 +285,11 @@
   margin-left: -12px;
 }
 .cnt-client-item:hover {
-  background: rgba(255,255,255,0.07);
+  background: var(--primary-light);
 }
 .cnt-client-item--active {
-  background: rgba(255,255,255,0.1) !important;
-  border-left-color: #60a5fa;
+  background: var(--primary-light) !important;
+  border-left-color: var(--primary);
 }
 
 .cnt-client-item-main {
@@ -302,14 +302,14 @@
 .cnt-client-nome {
   font-size: 0.875rem;
   font-weight: 500;
-  color: rgba(255,255,255,0.75);
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .cnt-client-item--active .cnt-client-nome,
 .cnt-client-item:hover .cnt-client-nome {
-  color: rgba(255,255,255,0.95);
+  color: var(--primary);
 }
 
 /* Client action buttons */
@@ -334,8 +334,8 @@
   border-radius: 4px;
   transition: color 0.15s, background 0.15s;
 }
-.cnt-client-action:hover { color: #93c5fd; background: rgba(255,255,255,0.1); }
-.cnt-client-action--danger:hover { color: #fca5a5; background: rgba(220,38,38,0.2); }
+.cnt-client-action:hover { color: var(--primary); background: var(--primary-light); }
+.cnt-client-action--danger:hover { color: #dc2626; background: #fee2e2; }
 
 /* Connect button */
 .cnt-connect-btn {
@@ -345,23 +345,23 @@
   margin: 0;
   padding: 9px 12px;
   border-radius: 8px;
-  background: rgba(255,255,255,0.07);
-  color: rgba(255,255,255,0.6);
-  border: 1px dashed rgba(255,255,255,0.2);
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
 .cnt-connect-btn:hover {
-  background: rgba(255,255,255,0.12);
-  color: rgba(255,255,255,0.9);
+  background: var(--primary-light);
+  color: var(--primary);
 }
 
 /* Logout button */
 .cnt-sidebar-footer {
   padding: 12px;
-  border-top: 1px solid rgba(255,255,255,0.08);
+  border-top: 1px solid #e8e8e8;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -374,7 +374,7 @@
   width: 100%;
   border: none;
   background: transparent;
-  color: rgba(255,255,255,0.45);
+  color: var(--text-muted);
   border-radius: 8px;
   cursor: pointer;
   font-size: 0.85rem;
@@ -383,8 +383,8 @@
   text-align: left;
 }
 .cnt-logout-btn:hover {
-  background: rgba(220,38,38,0.18);
-  color: #fca5a5;
+  background: #fee2e2;
+  color: #dc2626;
 }
 
 /* ─── Main area ──────────────────────────────────────────── */

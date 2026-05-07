@@ -161,6 +161,27 @@ router.get('/clientes', contadorAuthMiddleware, async (req: Request, res: Respon
   }
 });
 
+// ── PATCH /api/contador/clientes/:id ─────────────────────────────────────────
+router.patch('/clientes/:id', contadorAuthMiddleware, async (req: Request, res: Response) => {
+  const contadorId = getContadorId(req);
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: 'ID inválido.' });
+  }
+  const { nome } = req.body as { nome?: string };
+  if (!nome?.trim()) {
+    return res.status(400).json({ error: 'Nome é obrigatório.' });
+  }
+  try {
+    const cliente = await db.renameContadorCliente(contadorId, id, nome.trim());
+    if (!cliente) return res.status(404).json({ error: 'Cliente não encontrado.' });
+    return res.json({ cliente });
+  } catch (err) {
+    console.error('[PATCH /contador/clientes/:id]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
 // ── DELETE /api/contador/clientes/:id ────────────────────────────────────────
 router.delete('/clientes/:id', contadorAuthMiddleware, async (req: Request, res: Response) => {
   const contadorId = getContadorId(req);

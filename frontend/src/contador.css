@@ -257,7 +257,17 @@
   text-transform: uppercase;
 }
 
-.cnt-client-remove {
+.cnt-client-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.cnt-client-item:hover .cnt-client-actions { opacity: 1; }
+
+.cnt-client-action {
   background: none;
   border: none;
   cursor: pointer;
@@ -266,12 +276,10 @@
   align-items: center;
   padding: 3px;
   border-radius: 4px;
-  opacity: 0;
-  transition: opacity 0.15s, color 0.15s;
-  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
 }
-.cnt-client-item:hover .cnt-client-remove { opacity: 1; }
-.cnt-client-remove:hover { color: #e03e3e; }
+.cnt-client-action:hover { color: #3b82f6; background: rgba(59,130,246,0.08); }
+.cnt-client-action--danger:hover { color: #e03e3e; background: rgba(224,62,62,0.08); }
 
 .cnt-connect-btn {
   display: flex;

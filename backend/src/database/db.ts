@@ -645,4 +645,15 @@ export const db = {
   async updateContadorClienteAccess(id: number): Promise<void> {
     await supabase.from('contador_clientes').update({ last_accessed_at: new Date().toISOString() }).eq('id', id);
   },
+
+  async renameContadorCliente(contadorId: number, id: number, nome: string): Promise<ContadorCliente | undefined> {
+    const { data, error } = await supabase
+      .from('contador_clientes')
+      .update({ nome_conexao: nome })
+      .eq('id', id)
+      .eq('contador_id', contadorId)
+      .select().maybeSingle();
+    if (error) raise(error, 'renameContadorCliente');
+    return data ?? undefined;
+  },
 };

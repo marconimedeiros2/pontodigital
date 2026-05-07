@@ -129,6 +129,75 @@ function ConnectModal({ onConnect, onClose }: ConnectModalProps) {
   );
 }
 
+// ── Rename modal ──────────────────────────────────────────────────────────────
+interface RenameModalProps {
+  nomeAtual: string;
+  onRename: (novoNome: string) => Promise<void>;
+  onClose: () => void;
+}
+
+function RenameModal({ nomeAtual, onRename, onClose }: RenameModalProps) {
+  const [nome, setNome] = useState(nomeAtual);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nome.trim() || nome.trim() === nomeAtual) { onClose(); return; }
+    setLoading(true);
+    setError('');
+    try {
+      await onRename(nome.trim());
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao renomear');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="cnt-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="cnt-modal cnt-modal--sm">
+        <div className="cnt-modal-header">
+          <h3 className="cnt-modal-title">Renomear cliente</h3>
+          <button className="cnt-modal-close" onClick={onClose}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="cnt-modal-form">
+          <div className="cnt-field">
+            <label className="cnt-label">Nome do cliente</label>
+            <input
+              className="cnt-input"
+              value={nome}
+              onChange={(e) => { setNome(e.target.value); setError(''); }}
+              disabled={loading}
+              autoFocus
+            />
+          </div>
+          {error && (
+            <div className="cnt-error">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              {error}
+            </div>
+          )}
+          <div className="cnt-modal-actions">
+            <button type="button" className="cnt-btn cnt-btn--ghost" onClick={onClose} disabled={loading}>Cancelar</button>
+            <button type="submit" className="cnt-btn cnt-btn--primary" disabled={loading || !nome.trim()}>
+              {loading ? 'Salvando…' : 'Salvar'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── Delete confirm modal ──────────────────────────────────────────────────────
 interface ConfirmDeleteProps {
   nome: string;
@@ -185,6 +254,7 @@ export function ContadorDashboard({ nome, onLogout }: Props) {
   const [loadingRel, setLoadingRel] = useState(false);
   const [showConnect, setShowConnect] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ContadorCliente | null>(null);
+  const [renameTarget, setRenameTarget] = useState<ContadorCliente | null>(null);
   const [relError, setRelError] = useState('');
 
   // Load clients
@@ -228,6 +298,12 @@ export function ContadorDashboard({ nome, onLogout }: Props) {
       return [...prev, cliente];
     });
     setSelectedCliente(cliente);
+  };
+
+  const handleRename = async (cliente: ContadorCliente, novoNome: string) => {
+    const { cliente: updated } = await contadorApi.renameCliente(cliente.id, novoNome);
+    setClientes((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    if (selectedCliente?.id === updated.id) setSelectedCliente(updated);
   };
 
   const handleDelete = async (cliente: ContadorCliente) => {
@@ -285,15 +361,27 @@ export function ContadorDashboard({ nome, onLogout }: Props) {
                 <div className="cnt-client-item-main">
                   <span className="cnt-client-nome">{c.nome_conexao}</span>
                 </div>
-                <button
-                  className="cnt-client-remove"
-                  title="Desconectar"
-                  onClick={(e) => { e.stopPropagation(); setDeleteTarget(c); }}
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
+                <div className="cnt-client-actions">
+                  <button
+                    className="cnt-client-action"
+                    title="Renomear"
+                    onClick={(e) => { e.stopPropagation(); setRenameTarget(c); }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                  </button>
+                  <button
+                    className="cnt-client-action cnt-client-action--danger"
+                    title="Desconectar"
+                    onClick={(e) => { e.stopPropagation(); setDeleteTarget(c); }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -447,6 +535,14 @@ export function ContadorDashboard({ nome, onLogout }: Props) {
           nome={deleteTarget.nome_conexao}
           onConfirm={() => handleDelete(deleteTarget)}
           onClose={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {renameTarget && (
+        <RenameModal
+          nomeAtual={renameTarget.nome_conexao}
+          onRename={(novoNome) => handleRename(renameTarget, novoNome)}
+          onClose={() => setRenameTarget(null)}
         />
       )}
     </div>

@@ -66,6 +66,12 @@ export const contadorApi = {
   listClientes: () =>
     request<{ clientes: ContadorCliente[] }>(`${BASE}/clientes`),
 
+  renameCliente: (id: number, nome: string) =>
+    request<{ cliente: ContadorCliente }>(`${BASE}/clientes/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ nome }),
+    }),
+
   deleteCliente: (id: number) =>
     request<{ ok: boolean }>(`${BASE}/clientes/${id}`, { method: 'DELETE' }),
 

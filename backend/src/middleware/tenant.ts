@@ -69,8 +69,8 @@ export async function tenantMiddleware(
   // Sem subdomínio → domínio raiz (admin / marketing), segue normal
   if (!sub) return next();
 
-  // Subdomínio reservado — GOD: não é tenant, não busca no banco
-  if (sub === 'god') return next();
+  // Subdomínios reservados — não são tenants, não buscam no banco
+  if (sub === 'god' || sub === 'contador') return next();
 
   // Validação de segurança: bloqueia subdomínios com caracteres perigosos
   if (!SUBDOMAIN_RE.test(sub)) {

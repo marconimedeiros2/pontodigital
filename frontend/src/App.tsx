@@ -10,6 +10,7 @@ import { PinStatusDrawer } from './components/PinStatusDrawer';
 import { ContadorLogin } from './components/ContadorLogin';
 import { ContadorDashboard } from './components/ContadorDashboard';
 import GodApp from './components/GodApp';
+import LandingPage from './components/LandingPage';
 import { getSubdomain } from './utils/tenant';
 import { api } from './services/api';
 import { adminApi } from './services/adminApi';
@@ -40,6 +41,8 @@ export default function App() {
   if (getSubdomain() === 'god') return <GodApp />;
   // Subdomínio "contador" → área do contador
   if (getSubdomain() === 'contador') return <ContadorApp />;
+  // Sem subdomínio (root domain) → landing page
+  if (!getSubdomain()) return <LandingPage />;
   const [view, setView] = useState<View>(() => {
     if (adminApi.hasToken()) return 'admin';
     if (contadorApi.hasToken()) return 'contador';

@@ -14,7 +14,12 @@ export function getSubdomain(): string | null {
     // 1. Prioridade máxima: query param ?__tenant=xxx
     const params = new URLSearchParams(window.location.search);
     const qTenant = params.get('__tenant');
-    if (qTenant) {
+    if (qTenant !== null) {
+      if (qTenant === '') {
+        // ?__tenant= vazio → força landing page (remove tenant da sessão)
+        sessionStorage.removeItem('__dev_tenant');
+        return null;
+      }
       // Persiste na sessão para não precisar repetir na URL
       sessionStorage.setItem('__dev_tenant', qTenant);
       return qTenant;

@@ -103,10 +103,20 @@ body {
   min-height: 100dvh;
 }
 
-/* Fundo neutro para páginas pós-login (admin e contador) */
+/* Fundo e tokens neutros para páginas pós-login (admin e contador) */
 .admin-layout,
 .cnt-dash {
   background: #F5F5F5 !important;
+  --border: #e8e8e8;
+  --shadow: 0 2px 12px rgba(0,0,0,0.06);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.10);
+  --bg: #F5F5F5;
+  --bg-card: #ffffff;
+  --text: #1a1a1a;
+  --text-muted: #6b7280;
+  --keypad-btn-bg: #f9f9f9;
+  --keypad-btn-hover: #f0f0f0;
+  --pin-dot-empty: #d1d5db;
 }
 
 /* ─── Header ─────────────────────────────────────────────── */

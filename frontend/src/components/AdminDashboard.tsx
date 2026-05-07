@@ -1732,6 +1732,9 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [bulkHoras, setBulkHoras] = useState('7:20');
   const [bulkIntervalo, setBulkIntervalo] = useState('1:00');
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [excluidos, setExcluidos] = useState<Usuario[]>([]);
+  const [showExcluidos, setShowExcluidos] = useState(false);
+  const [excluidosLoading, setExcluidosLoading] = useState(false);
 
   // Relatório state
   const [relInicio, setRelInicio] = useState(today);
@@ -1923,9 +1926,27 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     try { await adminApi.updateUsuario(u.pin, { ativo: !u.ativo }); await loadUsuarios(); } catch { /* ignore */ }
   };
 
+  const loadExcluidos = async () => {
+    setExcluidosLoading(true);
+    try { setExcluidos((await adminApi.listUsuariosExcluidos()).usuarios); }
+    catch { /* ignore */ }
+    finally { setExcluidosLoading(false); }
+  };
+
   const handleDeleteUsuario = async (pin: string) => {
-    if (!confirm('Remover este funcionário?')) return;
-    try { await adminApi.deleteUsuario(pin); await loadUsuarios(); } catch { /* ignore */ }
+    if (!confirm('Remover este funcionário? O registro será preservado e poderá ser restaurado.')) return;
+    try {
+      await adminApi.deleteUsuario(pin);
+      await loadUsuarios();
+      if (showExcluidos) await loadExcluidos();
+    } catch { /* ignore */ }
+  };
+
+  const handleRestoreUsuario = async (pin: string) => {
+    try {
+      await adminApi.restoreUsuario(pin);
+      await Promise.all([loadUsuarios(), loadExcluidos()]);
+    } catch { /* ignore */ }
   };
 
   const handleRelatorio = async (iniOverride?: string, fimOverride?: string) => {
@@ -2556,6 +2577,78 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {/* ── Funcionários removidos ── */}
+            {(adminRole === 'administrador' || adminRole === 'legacy') && (
+              <div style={{ marginTop: 24 }}>
+                <button
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8, background: 'none',
+                    border: 'none', cursor: 'pointer', color: 'var(--text-muted)',
+                    fontWeight: 600, fontSize: '0.88rem', padding: '6px 0',
+                  }}
+                  onClick={async () => {
+                    const next = !showExcluidos;
+                    setShowExcluidos(next);
+                    if (next && excluidos.length === 0) await loadExcluidos();
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                    style={{ transform: showExcluidos ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }}>
+                    <polyline points="9 18 15 12 9 6"/>
+                  </svg>
+                  Funcionários removidos
+                  {excluidos.length > 0 && (
+                    <span style={{ background: 'var(--border)', borderRadius: 10, padding: '1px 8px', fontSize: '0.78rem' }}>
+                      {excluidos.length}
+                    </span>
+                  )}
+                </button>
+
+                {showExcluidos && (
+                  <div className="admin-card" style={{ marginTop: 8 }}>
+                    {excluidosLoading && <div className="admin-empty"><span className="spinner" /></div>}
+                    {!excluidosLoading && excluidos.length === 0 && (
+                      <div className="admin-empty">Nenhum funcionário removido.</div>
+                    )}
+                    {!excluidosLoading && excluidos.length > 0 && (
+                      <div className="admin-table-wrap">
+                        <table className="admin-table">
+                          <thead>
+                            <tr><th>Nome</th><th>PIN</th><th>Removido em</th><th></th></tr>
+                          </thead>
+                          <tbody>
+                            {excluidos.map(u => (
+                              <tr key={u.pin} style={{ opacity: 0.75 }}>
+                                <td style={{ fontWeight: 600 }}>{u.nome}</td>
+                                <td><code style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{u.pin}</code></td>
+                                <td style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                                  {u.excluido_em ? new Date(u.excluido_em).toLocaleDateString('pt-BR') : '—'}
+                                </td>
+                                <td>
+                                  <button
+                                    className="icon-btn"
+                                    title="Restaurar funcionário"
+                                    style={{ color: 'var(--primary)', gap: 4, fontSize: '0.82rem', display: 'flex', alignItems: 'center' }}
+                                    onClick={() => handleRestoreUsuario(u.pin)}
+                                  >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                      <path d="M3 3v5h5"/>
+                                    </svg>
+                                    Restaurar
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

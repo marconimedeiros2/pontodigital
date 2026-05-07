@@ -118,7 +118,7 @@ router.get('/dashboard', authMiddleware, async (req: Request, res: Response) => 
   try {
     const [registros, usuarios] = await Promise.all([
       db.findByDate(clientId, data),
-      db.listUsuarios(clientId),
+      db.listAllUsuariosForLookup(clientId),
     ]);
 
     const usuariosMap = Object.fromEntries(usuarios.map((u) => [u.id, u]));
@@ -162,7 +162,7 @@ router.get('/relatorio', authMiddleware, async (req: Request, res: Response) => 
     const [todosVisiveis, todosOcultos, usuarios] = await Promise.all([
       db.findAll(clientId, 500),
       db.findAllHidden(clientId, 500),
-      db.listUsuarios(clientId),
+      db.listAllUsuariosForLookup(clientId),
     ]);
 
     const usuariosMap = Object.fromEntries(usuarios.map((u) => [u.id, u]));
@@ -464,6 +464,32 @@ router.delete('/usuarios/:pin', authMiddleware, async (req: Request, res: Respon
     return res.json({ ok: true });
   } catch (err) {
     console.error('[DELETE /usuarios/:pin]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// GET /api/admin/usuarios/excluidos
+router.get('/usuarios/excluidos', authMiddleware, async (req: Request, res: Response) => {
+  const clientId = req.client!.id;
+  try {
+    const usuarios = await db.listUsuariosExcluidos(clientId);
+    return res.json({ usuarios });
+  } catch (err) {
+    console.error('[GET /usuarios/excluidos]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// POST /api/admin/usuarios/:pin/restore
+router.post('/usuarios/:pin/restore', authMiddleware, requireAdminRole, async (req: Request, res: Response) => {
+  const { pin } = req.params;
+  const clientId = req.client!.id;
+  try {
+    const restored = await db.restoreUsuario(clientId, pin);
+    if (!restored) return res.status(404).json({ error: 'Usuário não encontrado ou não excluído.' });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[POST /usuarios/:pin/restore]', err);
     return res.status(500).json({ error: 'Erro interno.' });
   }
 });

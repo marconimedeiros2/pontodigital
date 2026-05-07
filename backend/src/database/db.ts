@@ -29,6 +29,8 @@ export interface Usuario {
   role: 'usuario' | 'membro' | 'administrador';
   cargo: string | null;
   created_at: string;
+  excluido: boolean;
+  excluido_em: string | null;
 }
 
 export interface RegistroLog {
@@ -269,8 +271,32 @@ export const db = {
       .select('*')
       .eq('client_id', clientId)
       .eq('role', 'usuario')
+      .eq('excluido', false)
       .order('nome', { ascending: true });
     if (error) raise(error, 'listUsuarios');
+    return (data ?? []) as Usuario[];
+  },
+
+  /** Retorna todos os usuários (incluindo excluídos) apenas para resolução de nomes em relatórios */
+  async listAllUsuariosForLookup(clientId: string): Promise<Pick<Usuario, 'id' | 'pin' | 'nome'>[]> {
+    const { data, error } = await supabase
+      .from('usuarios')
+      .select('id, pin, nome')
+      .eq('client_id', clientId)
+      .order('nome', { ascending: true });
+    if (error) raise(error, 'listAllUsuariosForLookup');
+    return (data ?? []) as Pick<Usuario, 'id' | 'pin' | 'nome'>[];
+  },
+
+  async listUsuariosExcluidos(clientId: string): Promise<Usuario[]> {
+    const { data, error } = await supabase
+      .from('usuarios')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('role', 'usuario')
+      .eq('excluido', true)
+      .order('excluido_em', { ascending: false });
+    if (error) raise(error, 'listUsuariosExcluidos');
     return (data ?? []) as Usuario[];
   },
 
@@ -280,6 +306,7 @@ export const db = {
       .select('*')
       .eq('client_id', clientId)
       .eq('pin', pin)
+      .eq('excluido', false)
       .maybeSingle();
     if (error) raise(error, 'findUsuario');
     return data ?? undefined;
@@ -305,6 +332,7 @@ export const db = {
       .from('usuarios')
       .select('*')
       .eq('client_id', clientId)
+      .eq('excluido', false)
       .in('role', roles)
       .order('nome', { ascending: true });
     if (error) raise(error, 'findUsuariosByRoles');
@@ -346,13 +374,30 @@ export const db = {
   },
 
   async deleteUsuario(clientId: string, pin: string): Promise<boolean> {
-    const { error, count } = await supabase
+    // Check if exists first
+    const { data: existing } = await supabase
+      .from('usuarios').select('id').eq('client_id', clientId).eq('pin', pin).eq('excluido', false).maybeSingle();
+    if (!existing) return false;
+    const { error } = await supabase
       .from('usuarios')
-      .delete({ count: 'exact' })
+      .update({ excluido: true, excluido_em: new Date().toISOString(), ativo: false })
       .eq('client_id', clientId)
       .eq('pin', pin);
     if (error) raise(error, 'deleteUsuario');
-    return (count ?? 0) > 0;
+    return true;
+  },
+
+  async restoreUsuario(clientId: string, pin: string): Promise<boolean> {
+    const { data: existing } = await supabase
+      .from('usuarios').select('id').eq('client_id', clientId).eq('pin', pin).eq('excluido', true).maybeSingle();
+    if (!existing) return false;
+    const { error } = await supabase
+      .from('usuarios')
+      .update({ excluido: false, excluido_em: null, ativo: true })
+      .eq('client_id', clientId)
+      .eq('pin', pin);
+    if (error) raise(error, 'restoreUsuario');
+    return true;
   },
 
   async changeUserPin(

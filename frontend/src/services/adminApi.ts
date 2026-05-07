@@ -64,6 +64,8 @@ export interface Usuario {
   role: 'usuario' | 'membro' | 'administrador';
   cargo: string | null;
   created_at: string;
+  excluido: boolean;
+  excluido_em: string | null;
 }
 
 export interface Membro {
@@ -203,6 +205,12 @@ export const adminApi = {
 
   deleteUsuario: (pin: string) =>
     request<{ ok: boolean }>(`${BASE}/usuarios/${pin}`, { method: 'DELETE' }),
+
+  listUsuariosExcluidos: () =>
+    request<{ usuarios: Usuario[] }>(`${BASE}/usuarios/excluidos`),
+
+  restoreUsuario: (pin: string) =>
+    request<{ ok: boolean }>(`${BASE}/usuarios/${pin}/restore`, { method: 'POST' }),
 
   updateRegistro: (
     id: number,

@@ -34,7 +34,8 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
 }
 
 function requireAdminRole(req: Request, res: Response, next: NextFunction): void {
-  if (req.adminSession?.role !== 'administrador') {
+  const role = req.adminSession?.role;
+  if (role !== 'administrador' && role !== 'legacy') {
     res.status(403).json({ error: 'Permissão insuficiente. Apenas administradores podem realizar esta ação.' });
     return;
   }

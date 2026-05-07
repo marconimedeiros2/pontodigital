@@ -2674,12 +2674,12 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   <div>
                     <h3 className="admin-card-title" style={{ marginBottom: 4 }}>Equipe Administrativa</h3>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
-                      {adminRole === 'administrador'
+                      {adminRole === 'administrador' || adminRole === 'legacy'
                         ? 'Gerencie administradores e membros com acesso ao painel.'
                         : 'Membros com acesso ao painel gerencial.'}
                     </p>
                   </div>
-                  {adminRole === 'administrador' && (
+                  {(adminRole === 'administrador' || adminRole === 'legacy') && (
                     <button
                       className="confirm-btn"
                       style={{ padding: '8px 16px', fontSize: '0.88rem', whiteSpace: 'nowrap' }}
@@ -2719,7 +2719,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                           <th>Cargo</th>
                           <th>Papel</th>
                           <th>Status</th>
-                          {adminRole === 'administrador' && <th style={{ width: 80 }}></th>}
+                          {(adminRole === 'administrador' || adminRole === 'legacy') && <th style={{ width: 80 }}></th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -2756,7 +2756,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                                 {m.ativo ? 'Ativo' : 'Inativo'}
                               </span>
                             </td>
-                            {adminRole === 'administrador' && (
+                            {(adminRole === 'administrador' || adminRole === 'legacy') && (
                               <td>
                                 <div style={{ display: 'flex', gap: 6 }}>
                                   <button

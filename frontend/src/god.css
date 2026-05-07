@@ -214,6 +214,60 @@
   color: var(--god-muted);
 }
 
+/* ── Client filter (header) ────────────────────────────── */
+.god-client-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid var(--god-border);
+  border-radius: 8px;
+  padding: 4px 8px 4px 10px;
+}
+.god-client-filter__label {
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+.god-client-filter__select {
+  min-width: 160px;
+  max-width: 220px;
+  border: none !important;
+  background: transparent !important;
+  padding: 2px 4px !important;
+  font-size: 0.82rem;
+  color: var(--god-accent) !important;
+}
+.god-client-filter__clear {
+  padding: 2px 6px !important;
+  font-size: 0.75rem;
+  opacity: 0.6;
+}
+.god-client-filter__clear:hover { opacity: 1; }
+
+/* ── Conexão tags (contadores) ─────────────────────────── */
+.god-conexao-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid var(--god-border);
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+.god-conexao-tag code {
+  color: var(--god-accent);
+  font-size: 0.78rem;
+}
+.god-conexao-label {
+  color: var(--god-muted);
+  font-size: 0.72rem;
+  border-left: 1px solid var(--god-border);
+  padding-left: 5px;
+  margin-left: 2px;
+}
+
 .god-logout-btn {
   background: rgba(239,68,68,0.1);
   border: 1px solid rgba(239,68,68,0.25);

@@ -101,8 +101,19 @@ router.get('/auth/me', godAuthMiddleware, (req: Request, res: Response) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // OVERVIEW
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/overview', godAuthMiddleware, async (_req: Request, res: Response) => {
+router.get('/overview', godAuthMiddleware, async (req: Request, res: Response) => {
+  const { client_id } = req.query as { client_id?: string };
   const today = new Date().toISOString().split('T')[0];
+
+  let usersQ = supabase.from('usuarios').select('*', { count: 'exact', head: true }).eq('ativo', true);
+  let regQ   = supabase.from('registros').select('*', { count: 'exact', head: true });
+  let hojeQ  = supabase.from('registros').select('*', { count: 'exact', head: true }).eq('data', today);
+  if (client_id) {
+    usersQ = usersQ.eq('client_id', client_id);
+    regQ   = regQ.eq('client_id', client_id);
+    hojeQ  = hojeQ.eq('client_id', client_id);
+  }
+
   const [
     { count: totalClients },
     { count: totalUsers },
@@ -112,10 +123,9 @@ router.get('/overview', godAuthMiddleware, async (_req: Request, res: Response) 
     { count: totalContadores },
   ] = await Promise.all([
     supabase.from('clients').select('*', { count: 'exact', head: true }),
-    supabase.from('usuarios').select('*', { count: 'exact', head: true }).eq('ativo', true),
-    supabase.from('registros').select('*', { count: 'exact', head: true }),
+    usersQ, regQ,
     supabase.from('god_users').select('*', { count: 'exact', head: true }).eq('ativo', true),
-    supabase.from('registros').select('*', { count: 'exact', head: true }).eq('data', today),
+    hojeQ,
     supabase.from('contadores').select('*', { count: 'exact', head: true }).eq('ativo', true),
   ]);
   return res.json({
@@ -189,12 +199,15 @@ router.delete('/clients/:id', godAuthMiddleware, async (req: Request, res: Respo
 // USERS — visão global
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/users', godAuthMiddleware, async (req: Request, res: Response) => {
-  const { search, ativo, created_after, created_before } = req.query as Record<string, string>;
-  let query = supabase.from('usuarios').select('*').order('nome');
+  const { search, ativo, created_after, created_before, client_id } = req.query as Record<string, string>;
+  let query = supabase.from('usuarios')
+    .select('*, clients(id, subdomain, nome)')
+    .order('nome');
   if (search) query = query.ilike('nome', `%${search}%`);
   if (ativo !== undefined && ativo !== '') query = query.eq('ativo', ativo === 'true');
   if (created_after) query = query.gte('created_at', created_after);
   if (created_before) query = query.lte('created_at', created_before + 'T23:59:59');
+  if (client_id) query = query.eq('client_id', client_id);
 
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
@@ -206,23 +219,24 @@ router.get('/users', godAuthMiddleware, async (req: Request, res: Response) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/registros', godAuthMiddleware, async (req: Request, res: Response) => {
   const {
-    data_ini, data_fim, user_id, search,
+    data_ini, data_fim, user_id, search, client_id,
     page = '1', per_page = '50', format,
   } = req.query as Record<string, string>;
 
   const limit = Math.min(parseInt(per_page) || 50, 200);
   const offset = (Math.max(parseInt(page) || 1, 1) - 1) * limit;
 
-  // Busca registros + nome do usuário
+  // Busca registros + nome do usuário + cliente
   let query = supabase
     .from('registros')
-    .select('*, usuarios(id, nome, pin)', { count: 'exact' })
+    .select('*, usuarios(id, nome, pin), clients(id, subdomain, nome)', { count: 'exact' })
     .order('data', { ascending: false })
     .order('hora_inicial', { ascending: false });
 
   if (data_ini) query = query.gte('data', data_ini);
   if (data_fim) query = query.lte('data', data_fim);
   if (user_id) query = query.eq('usuario_id', user_id);
+  if (client_id) query = query.eq('client_id', client_id);
   if (search) {
     // Filtra por nome via join — limitação: Supabase não suporta ilike em join direto
     // Resolvemos filtrando após a query quando search está presente
@@ -284,7 +298,44 @@ router.get('/contadores', godAuthMiddleware, async (req: Request, res: Response)
 
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
-  return res.json(data);
+
+  const contadores = (data ?? []) as { id: number; email: string; nome: string; ativo: boolean; created_at: string }[];
+  if (contadores.length === 0) return res.json([]);
+
+  // Busca as conexões de cada contador + resolve subdomain via admin_config → clients
+  const contIds = contadores.map(c => c.id);
+  const { data: connections } = await supabase
+    .from('contador_clientes')
+    .select('contador_id, nome_conexao, connection_type, client_uuid')
+    .in('contador_id', contIds);
+
+  type ConexaoRaw = { contador_id: number; nome_conexao: string; connection_type: string; client_uuid: string };
+  const conns = (connections ?? []) as ConexaoRaw[];
+
+  let connsByContador = new Map<number, { subdomain: string; nome: string; nome_conexao: string; connection_type: string }[]>();
+
+  if (conns.length > 0) {
+    const uuids = [...new Set(conns.map(c => c.client_uuid))];
+    const { data: configs } = await supabase
+      .from('admin_config').select('client_uuid, client_id').in('client_uuid', uuids);
+    const uuidToClientId = new Map((configs ?? []).map((ac: { client_uuid: string; client_id: string }) => [ac.client_uuid, ac.client_id]));
+
+    const clientIds = [...new Set([...uuidToClientId.values()])];
+    const { data: clients } = await supabase
+      .from('clients').select('id, subdomain, nome').in('id', clientIds);
+    const clientMap = new Map((clients ?? []).map((c: { id: string; subdomain: string; nome: string }) => [c.id, c]));
+
+    for (const conn of conns) {
+      const clientId = uuidToClientId.get(conn.client_uuid);
+      const clientInfo = clientId ? clientMap.get(clientId) : null;
+      if (!clientInfo) continue;
+      const arr = connsByContador.get(conn.contador_id) ?? [];
+      arr.push({ subdomain: clientInfo.subdomain, nome: clientInfo.nome, nome_conexao: conn.nome_conexao, connection_type: conn.connection_type });
+      connsByContador.set(conn.contador_id, arr);
+    }
+  }
+
+  return res.json(contadores.map(c => ({ ...c, conexoes: connsByContador.get(c.id) ?? [] })));
 });
 
 router.post('/contadores', godAuthMiddleware, async (req: Request, res: Response) => {

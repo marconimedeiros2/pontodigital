@@ -24,14 +24,21 @@ function fmt(iso: string) { return new Date(iso).toLocaleDateString('pt-BR'); }
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface GodUser   { id: string; email: string; nome: string; ativo: boolean; last_login: string | null }
 interface Client    { id: string; subdomain: string; nome: string; ativo: boolean; created_at: string }
-interface UserRow   { id: string; nome: string; pin: string; ativo: boolean; horas_diarias: number; intervalo: number; created_at: string }
-interface ContRow   { id: number; email: string; nome: string; ativo: boolean; created_at: string }
+interface UserRow   {
+  id: string; nome: string; pin: string; ativo: boolean;
+  horas_diarias: number; intervalo: number; created_at: string;
+  client_id: string;
+  clients: { id: string; subdomain: string; nome: string } | null;
+}
+interface ConexaoRow { subdomain: string; nome: string; nome_conexao: string; connection_type: 'uuid' | 'api_key' }
+interface ContRow   { id: number; email: string; nome: string; ativo: boolean; created_at: string; conexoes?: ConexaoRow[] }
 interface Overview  { totalClients: number; totalUsers: number; totalRegistros: number; registrosHoje: number; totalGodUsers: number; totalContadores: number }
 interface RegistroGod {
   id: number; data: string; hora_inicial: string | null; inicio_intervalo: string | null;
   fim_intervalo: string | null; hora_final: string | null; horas_diarias: number | null;
   extra: boolean | null; oculto: boolean;
   usuarios: { id: string; nome: string; pin: string } | null;
+  clients: { id: string; subdomain: string; nome: string } | null;
 }
 
 // ── Shared: SVG icons ─────────────────────────────────────────────────────────
@@ -102,23 +109,28 @@ function GodLogin({ onLogin }: { onLogin: (god: GodUser) => void }) {
 }
 
 // ── OVERVIEW ──────────────────────────────────────────────────────────────────
-function OverviewTab() {
+function OverviewTab({ clientId }: { clientId: string }) {
   const [data, setData] = useState<Overview | null>(null);
-  useEffect(() => { api<Overview>('/overview').then(setData).catch(console.error); }, []);
+  useEffect(() => {
+    const params = clientId ? `?client_id=${clientId}` : '';
+    api<Overview>(`/overview${params}`).then(setData).catch(console.error);
+  }, [clientId]);
 
   const cards = data ? [
-    { label: 'Clientes',       value: data.totalClients,    icon: '🏢' },
+    { label: 'Clientes',       value: data.totalClients,    icon: '🏢', allOnly: true },
     { label: 'Usuários Ativos',value: data.totalUsers,      icon: '👤' },
-    { label: 'Contadores',     value: data.totalContadores, icon: '🧮' },
+    { label: 'Contadores',     value: data.totalContadores, icon: '🧮', allOnly: true },
     { label: 'Registros Total',value: data.totalRegistros,  icon: '📋' },
     { label: 'Registros Hoje', value: data.registrosHoje,   icon: '📅' },
-    { label: 'GOD Users',      value: data.totalGodUsers,   icon: '⭐' },
+    { label: 'GOD Users',      value: data.totalGodUsers,   icon: '⭐', allOnly: true },
   ] : [];
+
+  const visibleCards = cards.filter(c => !clientId || !c.allOnly);
 
   return (
     <div>
       <div className="god-stats-grid">
-        {!data ? <div className="god-empty">Carregando…</div> : cards.map(c => (
+        {!data ? <div className="god-empty">Carregando…</div> : visibleCards.map(c => (
           <div className="god-stat-card" key={c.label}>
             <div className="god-stat-icon" style={{ fontSize: '1.3rem' }}>{c.icon}</div>
             <div>
@@ -280,7 +292,7 @@ function ClientsTab() {
 }
 
 // ── USERS ─────────────────────────────────────────────────────────────────────
-function UsersTab() {
+function UsersTab({ clientId }: { clientId: string }) {
   const [users, setUsers]           = useState<UserRow[]>([]);
   const [loading, setLoading]       = useState(true);
   const [search, setSearch]         = useState('');
@@ -297,10 +309,11 @@ function UsersTab() {
     if (filterAtivo) params.set('ativo', filterAtivo);
     if (filterDateIni) params.set('created_after', filterDateIni);
     if (filterDateFim) params.set('created_before', filterDateFim);
+    if (clientId) params.set('client_id', clientId);
 
     api<UserRow[]>(`/users?${params}`)
       .then(setUsers).catch(console.error).finally(() => setLoading(false));
-  }, [search, filterAtivo, filterDateIni, filterDateFim]);
+  }, [search, filterAtivo, filterDateIni, filterDateFim, clientId]);
 
   useEffect(() => {
     clearTimeout(debounceRef.current);
@@ -333,13 +346,27 @@ function UsersTab() {
       <div className="god-card">
         <div className="god-table-wrap">
           <table className="god-table">
-            <thead><tr><th>Nome</th><th>PIN</th><th>Jornada</th><th>Intervalo</th><th>Status</th><th>Cadastrado</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                {!clientId && <th>Cliente</th>}
+                <th>PIN</th><th>Jornada</th><th>Intervalo</th><th>Status</th><th>Cadastrado</th>
+              </tr>
+            </thead>
             <tbody>
-              {loading && <tr><td colSpan={6} className="god-empty">Carregando…</td></tr>}
-              {!loading && users.length === 0 && <tr><td colSpan={6} className="god-empty">Nenhum usuário encontrado.</td></tr>}
+              {loading && <tr><td colSpan={clientId ? 6 : 7} className="god-empty">Carregando…</td></tr>}
+              {!loading && users.length === 0 && <tr><td colSpan={clientId ? 6 : 7} className="god-empty">Nenhum usuário encontrado.</td></tr>}
               {users.map(u => (
                 <tr key={u.id}>
                   <td style={{ fontWeight: 600 }}>{u.nome}</td>
+                  {!clientId && (
+                    <td>
+                      <code style={{ fontSize: '0.78rem', color: 'var(--god-accent)' }}>
+                        {u.clients?.subdomain ?? '—'}
+                      </code>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--god-muted)' }}>{u.clients?.nome ?? ''}</div>
+                    </td>
+                  )}
                   <td>
                     <code style={{ fontSize: '0.85rem', color: 'var(--god-accent)', letterSpacing: showPin ? 'normal' : '0.15em' }}>
                       {showPin ? u.pin : '••••'}
@@ -360,7 +387,7 @@ function UsersTab() {
 }
 
 // ── RELATÓRIOS ────────────────────────────────────────────────────────────────
-function RelatoriosTab() {
+function RelatoriosTab({ clientId }: { clientId: string }) {
   const [rows, setRows]           = useState<RegistroGod[]>([]);
   const [loading, setLoading]     = useState(false);
   const [total, setTotal]         = useState(0);
@@ -375,22 +402,24 @@ function RelatoriosTab() {
   const load = useCallback(async (p = 1) => {
     setLoading(true);
     const params = new URLSearchParams({ page: String(p), per_page: String(perPage) });
-    if (dataIni) params.set('data_ini', dataIni);
-    if (dataFim) params.set('data_fim', dataFim);
-    if (search)  params.set('search', search);
+    if (dataIni)   params.set('data_ini', dataIni);
+    if (dataFim)   params.set('data_fim', dataFim);
+    if (search)    params.set('search', search);
+    if (clientId)  params.set('client_id', clientId);
     try {
       const d = await api<{ registros: RegistroGod[]; total: number }>(`/registros?${params}`);
       setRows(d.registros); setTotal(d.total); setPage(p);
     } catch (e: unknown) { console.error(e); }
     finally { setLoading(false); }
-  }, [dataIni, dataFim, search]);
+  }, [dataIni, dataFim, search, clientId]);
 
   // CSV download com auth header via fetch
   async function downloadCsv() {
     const params = new URLSearchParams({ format: 'csv' });
-    if (dataIni) params.set('data_ini', dataIni);
-    if (dataFim) params.set('data_fim', dataFim);
-    if (search)  params.set('search', search);
+    if (dataIni)  params.set('data_ini', dataIni);
+    if (dataFim)  params.set('data_fim', dataFim);
+    if (search)   params.set('search', search);
+    if (clientId) params.set('client_id', clientId);
     const res = await fetch(`${BASE}/registros?${params}`, { headers: { Authorization: `Bearer ${getToken() ?? ''}` } });
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
@@ -440,17 +469,26 @@ function RelatoriosTab() {
           <table className="god-table">
             <thead>
               <tr>
-                <th>Data</th><th>Usuário</th><th>PIN</th>
+                <th>Data</th>
+                {!clientId && <th>Cliente</th>}
+                <th>Usuário</th><th>PIN</th>
                 <th>Entrada</th><th>Ini. Int.</th><th>Fim Int.</th><th>Saída</th>
                 <th>Trabalhado</th><th>Extra</th>
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={9} className="god-empty">Buscando…</td></tr>}
-              {!loading && rows.length === 0 && <tr><td colSpan={9} className="god-empty">Nenhum registro. Clique em Buscar.</td></tr>}
+              {loading && <tr><td colSpan={clientId ? 9 : 10} className="god-empty">Buscando…</td></tr>}
+              {!loading && rows.length === 0 && <tr><td colSpan={clientId ? 9 : 10} className="god-empty">Nenhum registro. Clique em Buscar.</td></tr>}
               {rows.map(r => (
                 <tr key={r.id}>
                   <td style={{ whiteSpace: 'nowrap', color: 'var(--god-muted)', fontSize: '0.82rem' }}>{r.data}</td>
+                  {!clientId && (
+                    <td>
+                      <code style={{ fontSize: '0.78rem', color: 'var(--god-accent)' }}>
+                        {r.clients?.subdomain ?? '—'}
+                      </code>
+                    </td>
+                  )}
                   <td style={{ fontWeight: 600 }}>{r.usuarios?.nome ?? '—'}</td>
                   <td><code style={{ fontSize: '0.8rem', color: 'var(--god-accent)' }}>{r.usuarios?.pin ?? '—'}</code></td>
                   <td>{r.hora_inicial ?? '—'}</td>
@@ -556,14 +594,28 @@ function ContadoresTab() {
       <div className="god-card">
         <div className="god-table-wrap">
           <table className="god-table">
-            <thead><tr><th>Nome</th><th>Email</th><th>Status</th><th>Cadastrado</th><th>Ações</th></tr></thead>
+            <thead><tr><th>Nome</th><th>Email</th><th>Clientes conectados</th><th>Status</th><th>Cadastrado</th><th>Ações</th></tr></thead>
             <tbody>
-              {loading && <tr><td colSpan={5} className="god-empty">Carregando…</td></tr>}
-              {!loading && contadores.length === 0 && <tr><td colSpan={5} className="god-empty">Nenhum contador encontrado.</td></tr>}
+              {loading && <tr><td colSpan={6} className="god-empty">Carregando…</td></tr>}
+              {!loading && contadores.length === 0 && <tr><td colSpan={6} className="god-empty">Nenhum contador encontrado.</td></tr>}
               {contadores.map(c => (
                 <tr key={c.id}>
                   <td style={{ fontWeight: 600 }}>{c.nome}</td>
                   <td style={{ color: 'var(--god-muted)', fontSize: '0.85rem' }}>{c.email}</td>
+                  <td>
+                    {!c.conexoes || c.conexoes.length === 0 ? (
+                      <span style={{ color: 'var(--god-muted)', fontSize: '0.8rem' }}>Nenhuma</span>
+                    ) : (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {c.conexoes.map((cx, i) => (
+                          <span key={i} className="god-conexao-tag" title={`${cx.nome} · ${cx.connection_type === 'api_key' ? 'API Key' : 'UUID'}`}>
+                            <code>{cx.subdomain}</code>
+                            <span className="god-conexao-label">{cx.nome_conexao}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </td>
                   <td><span className={`god-pill ${c.ativo ? 'god-pill--active' : 'god-pill--inactive'}`}>{c.ativo ? 'Ativo' : 'Inativo'}</span></td>
                   <td style={{ color: 'var(--god-muted)', fontSize: '0.8rem' }}>{fmt(c.created_at)}</td>
                   <td>
@@ -774,7 +826,13 @@ function ConfiguracoesTab() {
 type Tab = 'overview' | 'clients' | 'users' | 'relatorios' | 'contadores' | 'configuracoes';
 
 function GodDashboard({ god, onLogout }: { god: GodUser; onLogout: () => void }) {
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab]               = useState<Tab>('overview');
+  const [clients, setClients]       = useState<Client[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState('');
+
+  useEffect(() => {
+    api<Client[]>('/clients').then(setClients).catch(console.error);
+  }, []);
 
   async function handleLogout() {
     try { await api('/auth/logout', { method: 'POST' }); } catch { /* ignore */ }
@@ -790,6 +848,10 @@ function GodDashboard({ god, onLogout }: { god: GodUser; onLogout: () => void })
     { id: 'configuracoes', label: '⚙️ Configurações' },
   ];
 
+  const selectedClient = clients.find(c => c.id === selectedClientId);
+  const tabsWithFilter = ['overview', 'users', 'relatorios'];
+  const showClientFilter = tabsWithFilter.includes(tab);
+
   return (
     <div className="god-root">
       <div className="god-layout">
@@ -799,6 +861,28 @@ function GodDashboard({ god, onLogout }: { god: GodUser; onLogout: () => void })
             Flowbase Super Admin
           </div>
           <div className="god-header-spacer" />
+          {showClientFilter && (
+            <div className="god-client-filter">
+              <span className="god-client-filter__label">🏢</span>
+              <select
+                className="god-input god-input--sm god-client-filter__select"
+                value={selectedClientId}
+                onChange={e => setSelectedClientId(e.target.value)}
+              >
+                <option value="">Todos os clientes</option>
+                {clients.map(c => (
+                  <option key={c.id} value={c.id}>{c.subdomain} — {c.nome}</option>
+                ))}
+              </select>
+              {selectedClient && (
+                <button
+                  className="god-btn-sm god-btn-sm--ghost god-client-filter__clear"
+                  onClick={() => setSelectedClientId('')}
+                  title="Limpar filtro"
+                >✕</button>
+              )}
+            </div>
+          )}
           <span className="god-header-user">{god.nome}</span>
           <button className="god-logout-btn" onClick={handleLogout}>Sair</button>
         </header>
@@ -812,10 +896,10 @@ function GodDashboard({ god, onLogout }: { god: GodUser; onLogout: () => void })
         </nav>
 
         <main className="god-main">
-          {tab === 'overview'      && <OverviewTab />}
+          {tab === 'overview'      && <OverviewTab clientId={selectedClientId} />}
           {tab === 'clients'       && <ClientsTab />}
-          {tab === 'users'         && <UsersTab />}
-          {tab === 'relatorios'    && <RelatoriosTab />}
+          {tab === 'users'         && <UsersTab clientId={selectedClientId} />}
+          {tab === 'relatorios'    && <RelatoriosTab clientId={selectedClientId} />}
           {tab === 'contadores'    && <ContadoresTab />}
           {tab === 'configuracoes' && <ConfiguracoesTab />}
         </main>

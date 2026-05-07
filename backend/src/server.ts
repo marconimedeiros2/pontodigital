@@ -79,5 +79,5 @@ app.get('*', (req, res) => {
 
 // START
 app.listen(PORT, () => {
-  console.log(`\n🕐 Tempu rodando em http://localhost:${PORT}`);
+  console.log(`\n🕐 tempu rodando em http://localhost:${PORT}`);
 });

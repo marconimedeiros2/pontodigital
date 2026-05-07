@@ -14,15 +14,17 @@ const PORT = process.env.PORT || 3001;
 // Necessário para que req.hostname reflita o Host original quando atrás de nginx/proxy
 app.set('trust proxy', true);
 
-// CORS — aceita qualquer subdomínio de flowbase.tech
-const BASE_DOMAIN = process.env.BASE_DOMAIN || 'flowbase.tech';
+// CORS — aceita qualquer subdomínio do BASE_DOMAIN configurado
+const BASE_DOMAIN = process.env.BASE_DOMAIN || 'tempu.com.br';
+const escapedDomain = BASE_DOMAIN.replace(/\./g, '\\.');
+const subdomainRegex = new RegExp(`^https?:\\/\\/[a-z0-9-]+\\.${escapedDomain}(:\\d+)?$`);
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true); // same-origin / server-to-server
     const allowed =
       origin === `https://${BASE_DOMAIN}` ||
       origin === `http://${BASE_DOMAIN}` ||
-      /^https?:\/\/[a-z0-9-]+\.flowbase\.tech(:\d+)?$/.test(origin) ||
+      subdomainRegex.test(origin) ||
       origin.includes('localhost');
     callback(null, allowed);
   },

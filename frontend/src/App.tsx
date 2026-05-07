@@ -17,9 +17,29 @@ import { contadorApi } from './services/contadorApi';
 import type { View, TipoRegistro, Registro, RegistroResponse, HojeResponse } from './types';
 import { STEP_LABELS } from './types';
 
+function ContadorApp() {
+  const [nome, setNome] = useState(() => contadorApi.getNome());
+  const [loggedIn, setLoggedIn] = useState(() => contadorApi.hasToken());
+  if (!loggedIn) {
+    return (
+      <ContadorLogin
+        onLogin={(n) => { setNome(n); setLoggedIn(true); }}
+      />
+    );
+  }
+  return (
+    <ContadorDashboard
+      nome={nome}
+      onLogout={() => { contadorApi.clearSession(); setLoggedIn(false); }}
+    />
+  );
+}
+
 export default function App() {
-  // Subdomínio "god" → renderiza o painel GOD isolado, sem misturar com o app normal
+  // Subdomínio "god" → painel GOD
   if (getSubdomain() === 'god') return <GodApp />;
+  // Subdomínio "contador" → área do contador
+  if (getSubdomain() === 'contador') return <ContadorApp />;
   const [view, setView] = useState<View>(() => {
     if (adminApi.hasToken()) return 'admin';
     if (contadorApi.hasToken()) return 'contador';

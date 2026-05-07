@@ -3,7 +3,7 @@ import { contadorApi } from '../services/contadorApi';
 
 interface Props {
   onLogin: (nome: string) => void;
-  onBack: () => void;
+  onBack?: () => void;
 }
 
 export function ContadorLogin({ onLogin, onBack }: Props) {
@@ -33,12 +33,14 @@ export function ContadorLogin({ onLogin, onBack }: Props) {
   return (
     <div className="cnt-login-wrap">
       <div className="cnt-login-card">
-        <button className="cnt-back-btn" onClick={onBack} title="Voltar">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-          Voltar
-        </button>
+        {onBack && (
+          <button className="cnt-back-btn" onClick={onBack} title="Voltar">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+            Voltar
+          </button>
+        )}
 
         <div className="cnt-login-icon">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">

@@ -206,10 +206,7 @@ export default function App() {
 
       <header className="app-header">
         <div className="header-brand">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" />
-            <polyline points="12 6 12 12 16 14" />
-          </svg>
+          <img src="/favicon.png" width="28" height="28" alt="tempu" style={{borderRadius: '6px'}} />
           <span>tempu</span>
         </div>
         <div className="header-actions">

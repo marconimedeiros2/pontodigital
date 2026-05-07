@@ -379,9 +379,7 @@ export function ContadorDashboard({ nome, onLogout }: Props) {
         {/* Brand */}
         <div className="cnt-sidebar-brand">
           <div className="cnt-sidebar-brand-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
-            </svg>
+            <img src="/favicon.png" width="28" height="28" alt="tempu" />
           </div>
           <div className="cnt-sidebar-brand-text">
             <span className="cnt-sidebar-brand-name">tempu</span>

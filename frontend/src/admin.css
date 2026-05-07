@@ -121,15 +121,8 @@
 }
 
 .admin-sidebar-brand-icon {
-  width: 40px;
-  height: 40px;
-  background: var(--primary-light);
-  border: 1px solid var(--border);
-  border-radius: 10px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: var(--primary);
   flex-shrink: 0;
 }
 

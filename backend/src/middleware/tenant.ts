@@ -52,14 +52,14 @@ export async function tenantMiddleware(
   const rawHost = forwardedHost ?? req.hostname ?? (req.headers.host as string) ?? '';
   const bareHost = rawHost.split(':')[0].toLowerCase();
 
-  // Em dev (localhost), o frontend envia X-Tenant com o subdomain escolhido.
-  // Em produção usamos apenas o hostname real — X-Tenant é ignorado por segurança.
-  const isLocalDev = bareHost === 'localhost' || bareHost === '127.0.0.1';
-  const xTenant = isLocalDev
-    ? (req.headers['x-tenant'] as string | undefined)?.trim().toLowerCase()
-    : undefined;
+  // X-Tenant é aceito em qualquer ambiente.
+  // Em dev (localhost) é a única forma de identificar o tenant.
+  // Em produção pode ser necessário quando nginx não repassa o Host original.
+  // A validação contra o banco garante que apenas tenants reais são aceitos.
+  const xTenant = (req.headers['x-tenant'] as string | undefined)?.trim().toLowerCase();
 
-  // Se veio X-Tenant em dev, monta hostname sintético para reusar extractSubdomain
+  // Se veio X-Tenant, monta hostname sintético para reusar extractSubdomain;
+  // caso contrário usa o hostname real da requisição.
   const hostname = xTenant ? `${xTenant}.${BASE_DOMAIN}` : rawHost;
   const sub = extractSubdomain(hostname);
 

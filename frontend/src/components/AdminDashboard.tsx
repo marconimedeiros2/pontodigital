@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { adminApi, type RegistroAdmin, type DashboardStats, type Usuario, type RegistroLog, type CustomField, type ApiKey, type Membro } from '../services/adminApi';
+import { adminApi, type RegistroAdmin, type DashboardStats, type Usuario, type RegistroLog, type CustomField, type ApiKey, type Membro, type PermissionsMap, type RolePerms, DEFAULT_PERMISSIONS } from '../services/adminApi';
 import { STEP_LABELS } from '../types';
 import { exportToXlsx } from '../utils/exportXlsx';
 
@@ -1561,10 +1561,154 @@ function IntegrationsTab() {
   );
 }
 
+// ── Permissions Panel ─────────────────────────────────────────────────────────
+
+const PERM_RESOURCES: { key: string; label: string; actions: { key: keyof RolePerms; label: string }[] }[] = [
+  {
+    key: 'dashboard',
+    label: 'Dashboard',
+    actions: [{ key: 'dashboard', label: 'Visualizar' }],
+  },
+  {
+    key: 'funcionarios',
+    label: 'Funcionários',
+    actions: [
+      { key: 'funcionarios_view',   label: 'Visualizar' },
+      { key: 'funcionarios_edit',   label: 'Editar'     },
+      { key: 'funcionarios_delete', label: 'Excluir'    },
+    ],
+  },
+  {
+    key: 'relatorios',
+    label: 'Relatórios',
+    actions: [
+      { key: 'relatorios_view',   label: 'Visualizar' },
+      { key: 'relatorios_edit',   label: 'Editar'     },
+      { key: 'relatorios_delete', label: 'Ocultar'    },
+    ],
+  },
+];
+
+const ROLES_LABELS: { role: 'administrador' | 'membro'; label: string; color: string }[] = [
+  { role: 'administrador', label: '⭐ Administrador', color: '#7c3aed' },
+  { role: 'membro',        label: '👤 Membro',        color: '#2563eb' },
+];
+
+function PermissionsPanel({
+  perms,
+  onChange,
+}: {
+  perms: PermissionsMap;
+  onChange: (p: PermissionsMap) => void;
+}) {
+  function toggle(role: 'administrador' | 'membro', key: keyof RolePerms) {
+    const updated: PermissionsMap = {
+      ...perms,
+      [role]: { ...perms[role], [key]: !perms[role][key] },
+    };
+    // If view is disabled, also disable edit/delete of same resource
+    if (key === 'funcionarios_view' && !updated[role].funcionarios_view) {
+      updated[role].funcionarios_edit = false;
+      updated[role].funcionarios_delete = false;
+    }
+    if (key === 'relatorios_view' && !updated[role].relatorios_view) {
+      updated[role].relatorios_edit = false;
+      updated[role].relatorios_delete = false;
+    }
+    // If edit/delete is enabled but view is off, force view on
+    if ((key === 'funcionarios_edit' || key === 'funcionarios_delete') && updated[role][key]) {
+      updated[role].funcionarios_view = true;
+    }
+    if ((key === 'relatorios_edit' || key === 'relatorios_delete') && updated[role][key]) {
+      updated[role].relatorios_view = true;
+    }
+    onChange(updated);
+  }
+
+  return (
+    <div className="admin-card" style={{ marginTop: 20 }}>
+      <h3 className="admin-card-title" style={{ marginBottom: 4 }}>Permissões por Papel</h3>
+      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 20 }}>
+        Defina o que cada papel pode acessar no painel. O role <strong>Legado</strong> sempre tem acesso total.
+      </p>
+
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)' }}>
+                Recurso / Ação
+              </th>
+              {ROLES_LABELS.map(r => (
+                <th key={r.role} style={{ padding: '8px 20px', color: r.color, fontWeight: 700, fontSize: '0.85rem', borderBottom: '1px solid var(--border)', textAlign: 'center', minWidth: 140 }}>
+                  {r.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {PERM_RESOURCES.map((res, ri) => (
+              res.actions.map((action, ai) => (
+                <tr key={action.key} style={{ background: ri % 2 === 0 && ai === 0 ? 'var(--bg)' : undefined }}>
+                  <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', color: 'var(--text)' }}>
+                    {ai === 0 ? (
+                      <div>
+                        <span style={{ fontWeight: 700 }}>{res.label}</span>
+                        <span style={{ marginLeft: 8, fontSize: '0.78rem', color: 'var(--text-muted)', background: 'var(--bg)', padding: '2px 8px', borderRadius: 10 }}>{action.label}</span>
+                      </div>
+                    ) : (
+                      <span style={{ marginLeft: 16, color: 'var(--text-muted)' }}>↳ {action.label}</span>
+                    )}
+                  </td>
+                  {ROLES_LABELS.map(r => (
+                    <td key={r.role} style={{ padding: '10px 20px', borderBottom: '1px solid var(--border)', textAlign: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={() => toggle(r.role, action.key)}
+                        style={{
+                          width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer',
+                          background: perms[r.role][action.key] ? r.color : 'var(--border)',
+                          transition: 'background 0.2s',
+                          position: 'relative', flexShrink: 0, display: 'inline-flex', alignItems: 'center',
+                          padding: '0 3px',
+                        }}
+                        title={perms[r.role][action.key] ? 'Permitido — clique para revogar' : 'Bloqueado — clique para permitir'}
+                      >
+                        <span style={{
+                          width: 16, height: 16, borderRadius: '50%', background: 'white',
+                          display: 'block',
+                          transform: perms[r.role][action.key] ? 'translateX(18px)' : 'translateX(0)',
+                          transition: 'transform 0.2s',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                        }} />
+                      </button>
+                    </td>
+                  ))}
+                </tr>
+              ))
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [tab, setTab] = useState<AdminTab>('dashboard');
   const adminRole = adminApi.getRole();
   const adminNome = adminApi.getNome();
+
+  // ── Permissions ────────────────────────────────────────────────────────────
+  const [perms, setPerms] = useState<PermissionsMap>(DEFAULT_PERMISSIONS);
+
+  // Helper: can current role do action on resource?
+  const can = (key: keyof RolePerms): boolean => {
+    if (adminRole === 'legacy') return true;
+    const rp = perms[adminRole as 'administrador' | 'membro'];
+    return rp ? (rp[key] ?? true) : true;
+  };
+
   const [showPins, setShowPins] = useState(false);
 
   // Dashboard state
@@ -1687,6 +1831,10 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     } finally {
       setMembrosLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    adminApi.getPermissions().then(r => setPerms(r.permissions)).catch(() => {});
   }, []);
 
   useEffect(() => { if (tab === 'dashboard') loadDashboard(); }, [tab, loadDashboard]);
@@ -1904,16 +2052,16 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     } catch (e) { setConfigError(e instanceof Error ? e.message : 'Erro'); }
   };
 
-  const TABS: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
+  const ALL_TABS: { id: AdminTab; label: string; icon: React.ReactNode; permKey?: keyof RolePerms }[] = [
     {
-      id: 'dashboard', label: 'Dashboard',
+      id: 'dashboard', label: 'Dashboard', permKey: 'dashboard',
       icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
         <rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
       </svg>,
     },
     {
-      id: 'usuarios', label: 'Funcionários',
+      id: 'usuarios', label: 'Funcionários', permKey: 'funcionarios_view',
       icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
         <circle cx="9" cy="7" r="4"/>
@@ -1921,7 +2069,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
       </svg>,
     },
     {
-      id: 'relatorio', label: 'Relatórios',
+      id: 'relatorio', label: 'Relatórios', permKey: 'relatorios_view',
       icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
         <polyline points="14 2 14 8 20 8"/>
@@ -1937,6 +2085,8 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
       </svg>,
     },
   ];
+
+  const TABS = ALL_TABS.filter(t => !t.permKey || can(t.permKey));
 
   return (
     <div className="admin-layout">
@@ -2380,22 +2530,26 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                         </td>
                         <td>
                           <div className="action-btns">
-                            <button className="icon-btn icon-btn--edit"
-                              onClick={() => setEditingUsuario(u)} title="Editar">
-                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                              </svg>
-                            </button>
-                            <button className="icon-btn icon-btn--delete"
-                              onClick={() => handleDeleteUsuario(u.pin)} title="Remover">
-                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="3 6 5 6 21 6"/>
-                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                                <path d="M10 11v6M14 11v6"/>
-                                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-                              </svg>
-                            </button>
+                            {can('funcionarios_edit') && (
+                              <button className="icon-btn icon-btn--edit"
+                                onClick={() => setEditingUsuario(u)} title="Editar">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                </svg>
+                              </button>
+                            )}
+                            {can('funcionarios_delete') && (
+                              <button className="icon-btn icon-btn--delete"
+                                onClick={() => handleDeleteUsuario(u.pin)} title="Remover">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="3 6 5 6 21 6"/>
+                                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                                  <path d="M10 11v6M14 11v6"/>
+                                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                                </svg>
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -2425,12 +2579,14 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
             )}
             <div className="admin-section-header">
               <h2>Relatórios</h2>
-              <button className="btn-novo-registro" onClick={() => setShowAddModal(true)}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                </svg>
-                Novo Registro
-              </button>
+              {can('relatorios_edit') && (
+                <button className="btn-novo-registro" onClick={() => setShowAddModal(true)}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                  </svg>
+                  Novo Registro
+                </button>
+              )}
             </div>
 
             <div className="admin-card rel-filter-card">
@@ -2520,7 +2676,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    {selectedOcultos.length > 0 && (
+                    {selectedOcultos.length > 0 && can('relatorios_edit') && (
                       <button className="btn-restore btn-restore--bulk" onClick={handleRestoreSelected}>
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
@@ -2529,7 +2685,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                         Desocultar {selectedOcultos.length} selecionado{selectedOcultos.length > 1 ? 's' : ''}
                       </button>
                     )}
-                    {relSelected.size > 0 && relSelected.size > selectedOcultos.length && (
+                    {relSelected.size > 0 && relSelected.size > selectedOcultos.length && can('relatorios_delete') && (
                       <button className="btn-delete-selected" onClick={handleHideSelected}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
@@ -2564,21 +2720,26 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                           <td className="td-nome">{r.nome}</td>
                           {(['hora_inicial', 'inicio_intervalo', 'fim_intervalo', 'hora_final'] as TimeField[]).map((field) => (
                             <td key={field}>
-                              <TimeCell
-                                value={r[field]}
-                                onSave={(v) => handleFieldEdit(r.id, field, v)}
-                              />
+                              {can('relatorios_edit') ? (
+                                <TimeCell value={r[field]} onSave={(v) => handleFieldEdit(r.id, field, v)} />
+                              ) : (
+                                <span style={{ fontSize: '0.85rem', color: 'var(--text)' }}>{r[field] ? displayTime(r[field]!) : '—'}</span>
+                              )}
                             </td>
                           ))}
                           <td><strong>{calcWorkTime(r)}</strong></td>
                           {activeCustomFields.map((f) => (
                             <td key={f.id}>
-                              <CustomFieldInput
-                                field={f}
-                                value={customValues[r.id]?.[f.id] ?? f.valor_padrao ?? ''}
-                                onSave={(v) => handleCustomValueSave(r.id, f.id, v)}
-                                rowKey={r.id}
-                              />
+                              {can('relatorios_edit') ? (
+                                <CustomFieldInput
+                                  field={f}
+                                  value={customValues[r.id]?.[f.id] ?? f.valor_padrao ?? ''}
+                                  onSave={(v) => handleCustomValueSave(r.id, f.id, v)}
+                                  rowKey={r.id}
+                                />
+                              ) : (
+                                <span style={{ fontSize: '0.85rem', color: 'var(--text)' }}>{customValues[r.id]?.[f.id] ?? f.valor_padrao ?? '—'}</span>
+                              )}
                             </td>
                           ))}
                           <td><StatusBadge reg={r} /></td>
@@ -2595,7 +2756,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                             </button>
                           </td>
                           <td>
-                            {r.oculto && (
+                            {r.oculto && can('relatorios_edit') && (
                               <button className="btn-restore" onClick={() => handleRestoreRegistro(r.id)} title="Restaurar">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                   <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
@@ -3009,6 +3170,16 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   </div>
                 )}
               </div>
+            )}
+
+            {configTab === 'membros' && (adminRole === 'administrador' || adminRole === 'legacy') && (
+              <PermissionsPanel
+                perms={perms}
+                onChange={async (newPerms) => {
+                  setPerms(newPerms);
+                  try { await adminApi.savePermissions(newPerms); } catch { /* ignore */ }
+                }}
+              />
             )}
 
             {configTab === 'escala' && (

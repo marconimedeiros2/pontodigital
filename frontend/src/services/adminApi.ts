@@ -117,6 +117,34 @@ export interface ApiKey {
   revoked_at: string | null;
 }
 
+export interface RolePerms {
+  dashboard: boolean;
+  funcionarios_view: boolean;
+  funcionarios_edit: boolean;
+  funcionarios_delete: boolean;
+  relatorios_view: boolean;
+  relatorios_edit: boolean;
+  relatorios_delete: boolean;
+}
+
+export interface PermissionsMap {
+  administrador: RolePerms;
+  membro: RolePerms;
+}
+
+export const DEFAULT_PERMISSIONS: PermissionsMap = {
+  administrador: {
+    dashboard: true,
+    funcionarios_view: true, funcionarios_edit: true, funcionarios_delete: true,
+    relatorios_view: true,   relatorios_edit: true,   relatorios_delete: true,
+  },
+  membro: {
+    dashboard: true,
+    funcionarios_view: true,  funcionarios_edit: false, funcionarios_delete: false,
+    relatorios_view: true,    relatorios_edit: false,   relatorios_delete: false,
+  },
+};
+
 export const adminApi = {
   login: (senha: string) =>
     request<{ token: string; role: 'administrador' | 'membro' | 'legacy'; nome: string }>(`${BASE}/login`, {
@@ -284,6 +312,16 @@ export const adminApi = {
 
   deleteMembro: (pin: string) =>
     request<{ ok: boolean }>(`${BASE}/membros/${pin}`, { method: 'DELETE' }),
+
+  // ── Permissions ───────────────────────────────────────────────────────────────
+  getPermissions: () =>
+    request<{ permissions: PermissionsMap }>(`${BASE}/permissions`),
+
+  savePermissions: (permissions: PermissionsMap) =>
+    request<{ ok: boolean }>(`${BASE}/permissions`, {
+      method: 'PUT',
+      body: JSON.stringify({ permissions }),
+    }),
 
   saveToken: (token: string) => sessionStorage.setItem('admin_token', token),
   saveRole:  (role: string)  => sessionStorage.setItem('admin_role', role),

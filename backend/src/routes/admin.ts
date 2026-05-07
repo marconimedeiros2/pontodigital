@@ -796,4 +796,76 @@ router.delete('/integrations/keys/:id', authMiddleware, async (req: Request, res
   }
 });
 
+// ── Permissions ───────────────────────────────────────────────────────────────
+
+export interface RolePerms {
+  dashboard: boolean;
+  funcionarios_view: boolean;
+  funcionarios_edit: boolean;
+  funcionarios_delete: boolean;
+  relatorios_view: boolean;
+  relatorios_edit: boolean;
+  relatorios_delete: boolean;
+}
+
+export interface PermissionsMap {
+  administrador: RolePerms;
+  membro: RolePerms;
+}
+
+const DEFAULT_PERMISSIONS: PermissionsMap = {
+  administrador: {
+    dashboard: true,
+    funcionarios_view: true, funcionarios_edit: true, funcionarios_delete: true,
+    relatorios_view: true,   relatorios_edit: true,   relatorios_delete: true,
+  },
+  membro: {
+    dashboard: true,
+    funcionarios_view: true,  funcionarios_edit: false, funcionarios_delete: false,
+    relatorios_view: true,    relatorios_edit: false,   relatorios_delete: false,
+  },
+};
+
+// GET /api/admin/permissions
+router.get('/permissions', authMiddleware, async (req: Request, res: Response) => {
+  const { supabase } = await import('../database/supabaseClient');
+  const clientId = req.client!.id;
+  try {
+    const { data } = await supabase
+      .from('admin_config')
+      .select('permissions')
+      .eq('client_id', clientId)
+      .single();
+    const perms = (data?.permissions as PermissionsMap | null) ?? DEFAULT_PERMISSIONS;
+    // Merge with defaults to fill any missing keys
+    return res.json({
+      permissions: {
+        administrador: { ...DEFAULT_PERMISSIONS.administrador, ...perms.administrador },
+        membro:        { ...DEFAULT_PERMISSIONS.membro,        ...perms.membro },
+      },
+    });
+  } catch (err) {
+    console.error('[GET /permissions]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// PUT /api/admin/permissions
+router.put('/permissions', authMiddleware, requireAdminRole, async (req: Request, res: Response) => {
+  const { supabase } = await import('../database/supabaseClient');
+  const clientId = req.client!.id;
+  const { permissions } = req.body as { permissions?: PermissionsMap };
+  if (!permissions) return res.status(400).json({ error: 'permissions é obrigatório.' });
+  try {
+    await supabase
+      .from('admin_config')
+      .update({ permissions })
+      .eq('client_id', clientId);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[PUT /permissions]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
 export default router;

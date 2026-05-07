@@ -45,7 +45,7 @@ export function NumericKeypad({
                   <path d="M3 12h1" />
                 </svg>
               ) : isClear ? (
-                <span>C</span>
+                <span style={{ fontSize: '0.72em', fontWeight: 700, color: '#000' }}>Limpar</span>
               ) : (
                 key
               )}

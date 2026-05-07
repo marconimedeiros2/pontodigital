@@ -1926,7 +1926,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
           </div>
           <div className="admin-sidebar-brand-text">
             <span className="admin-sidebar-brand-name">tempu</span>
-            <span className="admin-sidebar-brand-sub">Painel Admin</span>
+            <span className="admin-sidebar-brand-sub">Painel Gerencial</span>
           </div>
         </div>
 

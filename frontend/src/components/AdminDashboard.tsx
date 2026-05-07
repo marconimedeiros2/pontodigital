@@ -2682,7 +2682,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   {(adminRole === 'administrador' || adminRole === 'legacy') && (
                     <button
                       className="confirm-btn"
-                      style={{ padding: '8px 16px', fontSize: '0.88rem', whiteSpace: 'nowrap' }}
+                      style={{ padding: '8px 18px', fontSize: '0.88rem', whiteSpace: 'nowrap', width: 'auto', height: 'auto', minWidth: 0, boxShadow: 'none' }}
                       onClick={() => {
                         setMfPin(''); setMfNome(''); setMfCargo(''); setMfRole('membro'); setMfAtivo(true); setMfNovoPin('');
                         setCreatingMembro(true);

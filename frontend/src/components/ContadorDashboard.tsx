@@ -439,18 +439,17 @@ export function ContadorDashboard({ nome, onLogout }: Props) {
           </ul>
         )}
 
-        <button className="cnt-connect-btn" onClick={() => setShowConnect(true)}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Conectar cliente
-        </button>
-
         {/* Spacer */}
         <div style={{ flex: 1 }} />
 
         {/* Footer */}
         <div className="cnt-sidebar-footer">
+          <button className="cnt-connect-btn" onClick={() => setShowConnect(true)}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Conectar cliente
+          </button>
           <button className="cnt-logout-btn" onClick={handleLogout}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />

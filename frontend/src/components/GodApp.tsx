@@ -30,6 +30,12 @@ interface UserRow   {
   client_id: string;
   clients: { id: string; subdomain: string; nome: string } | null;
 }
+interface AdminMemberRow {
+  id: string; pin: string; nome: string; cargo: string | null;
+  role: 'administrador' | 'membro'; ativo: boolean; created_at: string;
+  client_id: string;
+  clients: { id: string; subdomain: string; nome: string } | null;
+}
 interface ConexaoRow { subdomain: string; nome: string; nome_conexao: string; connection_type: 'uuid' | 'api_key' }
 interface ContRow   { id: number; email: string; nome: string; ativo: boolean; created_at: string; conexoes?: ConexaoRow[] }
 interface Overview  { totalClients: number; totalUsers: number; totalRegistros: number; registrosHoje: number; totalGodUsers: number; totalContadores: number }
@@ -158,6 +164,9 @@ function ClientsTab() {
   const [fNome, setFNome]       = useState('');
   const [fSub, setFSub]         = useState('');
   const [fAtivo, setFAtivo]     = useState(true);
+  // admin PIN/nome for new client
+  const [fAdminPin, setFAdminPin]   = useState('');
+  const [fAdminNome, setFAdminNome] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -168,7 +177,7 @@ function ClientsTab() {
   useEffect(() => { load(); }, [load]);
 
   function openEdit(c: Client) { setEditing(c); setFNome(c.nome); setFSub(c.subdomain); setFAtivo(c.ativo); setError(''); }
-  function openCreate() { setCreating(true); setFNome(''); setFSub(''); setFAtivo(true); setError(''); }
+  function openCreate() { setCreating(true); setFNome(''); setFSub(''); setFAtivo(true); setFAdminPin(''); setFAdminNome(''); setError(''); }
 
   async function saveEdit(e: React.FormEvent) {
     e.preventDefault(); setError(''); setSaving(true);
@@ -182,7 +191,10 @@ function ClientsTab() {
   async function saveCreate(e: React.FormEvent) {
     e.preventDefault(); setError(''); setSaving(true);
     try {
-      await api('/clients', { method: 'POST', body: JSON.stringify({ nome: fNome, subdomain: fSub.toLowerCase() }) });
+      await api('/clients', { method: 'POST', body: JSON.stringify({
+        nome: fNome, subdomain: fSub.toLowerCase(),
+        adminPin: fAdminPin, adminNome: fAdminNome,
+      })});
       setCreating(false); await load();
     } catch (err: unknown) { setError(err instanceof Error ? err.message : 'Erro'); }
     finally { setSaving(false); }
@@ -268,6 +280,20 @@ function ClientsTab() {
               <label className="god-label">Subdomínio</label>
               <input className="god-input" value={fSub} onChange={e => setFSub(e.target.value)} required placeholder="ex: empresa" pattern="[a-z0-9][a-z0-9-]*" />
               {fSub && <div style={{ fontSize: '0.74rem', color: 'var(--god-muted)', marginTop: 4 }}>{fSub.toLowerCase()}.flowbase.tech</div>}
+            </div>
+            <div style={{ borderTop: '1px solid var(--god-border)', margin: '14px 0 14px', paddingTop: 14 }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--god-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>
+                Administrador inicial
+              </div>
+              <div className="god-form-group">
+                <label className="god-label">Nome do administrador</label>
+                <input className="god-input" value={fAdminNome} onChange={e => setFAdminNome(e.target.value)} required placeholder="Ex: João Silva" />
+              </div>
+              <div className="god-form-group">
+                <label className="god-label">PIN de acesso (4–6 dígitos)</label>
+                <input className="god-input" type="tel" inputMode="numeric" maxLength={6}
+                  value={fAdminPin} onChange={e => setFAdminPin(e.target.value.replace(/\D/g, ''))} required placeholder="Ex: 1234" />
+              </div>
             </div>
             <div className="god-modal-actions">
               <button type="button" className="god-btn-sm god-btn-sm--ghost" onClick={() => setCreating(false)}>Cancelar</button>
@@ -680,6 +706,263 @@ function ContadoresTab() {
   );
 }
 
+// ── ADMIN MEMBERS ─────────────────────────────────────────────────────────────
+function AdminMembersTab({ clients, clientId }: { clients: Client[]; clientId: string }) {
+  const [rows, setRows]         = useState<AdminMemberRow[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [showPin, setShowPin]   = useState(false);
+  const [editing, setEditing]   = useState<AdminMemberRow | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [error, setError]       = useState('');
+  const [saving, setSaving]     = useState(false);
+
+  // form
+  const [fPin, setFPin]         = useState('');
+  const [fNome, setFNome]       = useState('');
+  const [fCargo, setFCargo]     = useState('');
+  const [fRole, setFRole]       = useState<'administrador' | 'membro'>('administrador');
+  const [fAtivo, setFAtivo]     = useState(true);
+  const [fNovoPin, setFNovoPin] = useState('');
+  const [fClientId, setFClientId] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (clientId) params.set('client_id', clientId);
+      setRows(await api<AdminMemberRow[]>(`/admin-members?${params}`));
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
+  }, [clientId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  function openCreate() {
+    setFPin(''); setFNome(''); setFCargo(''); setFRole('administrador');
+    setFAtivo(true); setFClientId(clientId || ''); setError('');
+    setCreating(true);
+  }
+
+  function openEdit(r: AdminMemberRow) {
+    setEditing(r); setFPin(r.pin); setFNome(r.nome); setFCargo(r.cargo || '');
+    setFRole(r.role); setFAtivo(r.ativo); setFNovoPin(r.pin); setError('');
+  }
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault(); setError(''); setSaving(true);
+    try {
+      await api('/admin-members', { method: 'POST', body: JSON.stringify({
+        client_id: fClientId, pin: fPin, nome: fNome,
+        cargo: fCargo || undefined, role: fRole,
+      })});
+      setCreating(false); await load();
+    } catch (err: unknown) { setError(err instanceof Error ? err.message : 'Erro'); }
+    finally { setSaving(false); }
+  }
+
+  async function handleEdit(e: React.FormEvent) {
+    e.preventDefault(); setError(''); setSaving(true);
+    try {
+      const body: Record<string, unknown> = { nome: fNome, cargo: fCargo || null, role: fRole, ativo: fAtivo };
+      if (fNovoPin !== editing!.pin) body.novoPin = fNovoPin;
+      await api(`/admin-members/${editing!.id}`, { method: 'PATCH', body: JSON.stringify(body) });
+      setEditing(null); await load();
+    } catch (err: unknown) { setError(err instanceof Error ? err.message : 'Erro'); }
+    finally { setSaving(false); }
+  }
+
+  async function handleDelete(id: string) {
+    try { await api(`/admin-members/${id}`, { method: 'DELETE' }); setDeleteId(null); await load(); }
+    catch (err: unknown) { alert(err instanceof Error ? err.message : 'Erro'); }
+  }
+
+  const RolePill = ({ role }: { role: 'administrador' | 'membro' }) => (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: '2px 10px', borderRadius: 20, fontSize: '0.78rem', fontWeight: 700,
+      background: role === 'administrador' ? 'rgba(139,92,246,0.15)' : 'rgba(59,130,246,0.15)',
+      color: role === 'administrador' ? '#7c3aed' : '#2563eb',
+    }}>
+      {role === 'administrador' ? '⭐ Administrador' : '👤 Membro'}
+    </span>
+  );
+
+  const RoleToggle = ({ value, onChange }: { value: 'administrador' | 'membro'; onChange: (v: 'administrador' | 'membro') => void }) => (
+    <div style={{ display: 'flex', gap: 8 }}>
+      {(['administrador', 'membro'] as const).map(r => (
+        <button key={r} type="button"
+          onClick={() => onChange(r)}
+          style={{
+            flex: 1, padding: '7px 0', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem',
+            border: `2px solid ${value === r ? 'var(--god-accent)' : 'var(--god-border)'}`,
+            background: value === r ? 'rgba(99,102,241,0.12)' : 'transparent',
+            color: value === r ? 'var(--god-accent)' : 'var(--god-muted)',
+            transition: 'all 0.15s',
+          }}
+        >
+          {r === 'administrador' ? '⭐ Administrador' : '👤 Membro'}
+        </button>
+      ))}
+    </div>
+  );
+
+  const colSpan = clientId ? 5 : 6;
+
+  return (
+    <div>
+      <div className="god-section-header">
+        <span className="god-section-title">
+          {loading ? 'Carregando…' : `${rows.length} membro${rows.length !== 1 ? 's' : ''} administrativo${rows.length !== 1 ? 's' : ''}`}
+        </span>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className={`god-btn-sm ${showPin ? 'god-btn-sm--primary' : 'god-btn-sm--ghost'}`} onClick={() => setShowPin(v => !v)}>
+            {showPin ? <IconEyeOff /> : <IconEye />} {showPin ? 'Ocultar PINs' : 'Mostrar PINs'}
+          </button>
+          <button className="god-btn-sm god-btn-sm--primary" onClick={openCreate}><IconPlus /> Novo membro</button>
+        </div>
+      </div>
+
+      <div className="god-card">
+        <div className="god-table-wrap">
+          <table className="god-table">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                {!clientId && <th>Cliente</th>}
+                <th>PIN</th>
+                <th>Cargo</th>
+                <th>Papel</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && <tr><td colSpan={colSpan + 2} className="god-empty">Carregando…</td></tr>}
+              {!loading && rows.length === 0 && <tr><td colSpan={colSpan + 2} className="god-empty">Nenhum membro administrativo.</td></tr>}
+              {rows.map(r => (
+                <tr key={r.id}>
+                  <td style={{ fontWeight: 600 }}>{r.nome}</td>
+                  {!clientId && (
+                    <td>
+                      <code style={{ fontSize: '0.78rem', color: 'var(--god-accent)' }}>{r.clients?.subdomain ?? '—'}</code>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--god-muted)' }}>{r.clients?.nome ?? ''}</div>
+                    </td>
+                  )}
+                  <td>
+                    <code style={{ fontSize: '0.85rem', color: 'var(--god-accent)', letterSpacing: showPin ? 'normal' : '0.15em' }}>
+                      {showPin ? r.pin : '••••'}
+                    </code>
+                  </td>
+                  <td style={{ color: 'var(--god-muted)', fontSize: '0.85rem' }}>{r.cargo || <span style={{ opacity: 0.4 }}>—</span>}</td>
+                  <td><RolePill role={r.role} /></td>
+                  <td><span className={`god-pill ${r.ativo ? 'god-pill--active' : 'god-pill--inactive'}`}>{r.ativo ? 'Ativo' : 'Inativo'}</span></td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button className="god-btn-sm god-btn-sm--ghost" onClick={() => openEdit(r)}><IconEdit /> Editar</button>
+                      <button className="god-btn-sm god-btn-sm--danger" onClick={() => setDeleteId(r.id)}><IconTrash /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Modal criar */}
+      {creating && (
+        <Modal title="Novo Membro Administrativo" onClose={() => setCreating(false)}>
+          {error && <div className="god-error">{error}</div>}
+          <form onSubmit={handleCreate}>
+            {!clientId && (
+              <div className="god-form-group">
+                <label className="god-label">Cliente</label>
+                <select className="god-input" value={fClientId} onChange={e => setFClientId(e.target.value)} required>
+                  <option value="">Selecione…</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.subdomain} — {c.nome}</option>)}
+                </select>
+              </div>
+            )}
+            <div className="god-form-group">
+              <label className="god-label">Nome</label>
+              <input className="god-input" value={fNome} onChange={e => setFNome(e.target.value)} required placeholder="Nome completo" />
+            </div>
+            <div className="god-form-group">
+              <label className="god-label">PIN (4–6 dígitos)</label>
+              <input className="god-input" type="tel" inputMode="numeric" maxLength={6}
+                value={fPin} onChange={e => setFPin(e.target.value.replace(/\D/g, ''))} required placeholder="Ex: 1234" />
+            </div>
+            <div className="god-form-group">
+              <label className="god-label">Cargo <span style={{ fontWeight: 400, color: 'var(--god-muted)' }}>(opcional)</span></label>
+              <input className="god-input" value={fCargo} onChange={e => setFCargo(e.target.value)} placeholder="Ex: Gerente" />
+            </div>
+            <div className="god-form-group">
+              <label className="god-label">Papel</label>
+              <RoleToggle value={fRole} onChange={setFRole} />
+            </div>
+            <div className="god-modal-actions">
+              <button type="button" className="god-btn-sm god-btn-sm--ghost" onClick={() => setCreating(false)}>Cancelar</button>
+              <button type="submit" className="god-btn-sm god-btn-sm--primary" disabled={saving}>{saving ? 'Criando…' : 'Criar'}</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Modal editar */}
+      {editing && (
+        <Modal title="Editar Membro" onClose={() => { setEditing(null); setError(''); }}>
+          {error && <div className="god-error">{error}</div>}
+          <form onSubmit={handleEdit}>
+            <div className="god-form-group">
+              <label className="god-label">Nome</label>
+              <input className="god-input" value={fNome} onChange={e => setFNome(e.target.value)} required />
+            </div>
+            <div className="god-form-group">
+              <label className="god-label">PIN</label>
+              <input className="god-input" type="tel" inputMode="numeric" maxLength={6}
+                value={fNovoPin} onChange={e => setFNovoPin(e.target.value.replace(/\D/g, ''))} required />
+              {fNovoPin !== editing.pin && (
+                <div style={{ fontSize: '0.74rem', color: '#d97706', marginTop: 4, fontWeight: 500 }}>⚠️ O PIN de acesso será alterado.</div>
+              )}
+            </div>
+            <div className="god-form-group">
+              <label className="god-label">Cargo <span style={{ fontWeight: 400, color: 'var(--god-muted)' }}>(opcional)</span></label>
+              <input className="god-input" value={fCargo} onChange={e => setFCargo(e.target.value)} placeholder="Ex: Gerente" />
+            </div>
+            <div className="god-form-group">
+              <label className="god-label">Papel</label>
+              <RoleToggle value={fRole} onChange={setFRole} />
+            </div>
+            <div className="god-form-group">
+              <label className="god-label">Status</label>
+              <select className="god-input" value={fAtivo ? 'true' : 'false'} onChange={e => setFAtivo(e.target.value === 'true')}>
+                <option value="true">Ativo</option>
+                <option value="false">Inativo</option>
+              </select>
+            </div>
+            <div className="god-modal-actions">
+              <button type="button" className="god-btn-sm god-btn-sm--ghost" onClick={() => { setEditing(null); setError(''); }}>Cancelar</button>
+              <button type="submit" className="god-btn-sm god-btn-sm--primary" disabled={saving}>{saving ? 'Salvando…' : 'Salvar'}</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Modal delete */}
+      {deleteId && (
+        <Modal title="Remover membro?" onClose={() => setDeleteId(null)}>
+          <p style={{ color: 'var(--god-muted)', fontSize: '0.88rem' }}>O acesso ao painel será removido. Registros de ponto não são afetados.</p>
+          <div className="god-modal-actions">
+            <button className="god-btn-sm god-btn-sm--ghost" onClick={() => setDeleteId(null)}>Cancelar</button>
+            <button className="god-btn-sm god-btn-sm--danger" onClick={() => handleDelete(deleteId!)}>Remover</button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
 // ── CONFIGURAÇÕES ─────────────────────────────────────────────────────────────
 function ConfiguracoesTab() {
   const [hasGlobal, setHasGlobal]   = useState<boolean | null>(null);
@@ -823,7 +1106,7 @@ function ConfiguracoesTab() {
 }
 
 // ── DASHBOARD LAYOUT ──────────────────────────────────────────────────────────
-type Tab = 'overview' | 'clients' | 'users' | 'relatorios' | 'contadores' | 'configuracoes';
+type Tab = 'overview' | 'clients' | 'users' | 'admin-members' | 'relatorios' | 'contadores' | 'configuracoes';
 
 function GodDashboard({ god, onLogout }: { god: GodUser; onLogout: () => void }) {
   const [tab, setTab]               = useState<Tab>('overview');
@@ -840,16 +1123,17 @@ function GodDashboard({ god, onLogout }: { god: GodUser; onLogout: () => void })
   }
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'overview',      label: '📊 Visão Geral' },
-    { id: 'clients',       label: '🏢 Clientes' },
-    { id: 'users',         label: '👤 Usuários' },
-    { id: 'relatorios',    label: '📋 Relatórios' },
-    { id: 'contadores',    label: '🧮 Contadores' },
-    { id: 'configuracoes', label: '⚙️ Configurações' },
+    { id: 'overview',       label: '📊 Visão Geral' },
+    { id: 'clients',        label: '🏢 Clientes' },
+    { id: 'users',          label: '👤 Funcionários' },
+    { id: 'admin-members',  label: '⭐ Administradores' },
+    { id: 'relatorios',     label: '📋 Relatórios' },
+    { id: 'contadores',     label: '🧮 Contadores' },
+    { id: 'configuracoes',  label: '⚙️ Configurações' },
   ];
 
   const selectedClient = clients.find(c => c.id === selectedClientId);
-  const tabsWithFilter = ['overview', 'users', 'relatorios'];
+  const tabsWithFilter = ['overview', 'users', 'admin-members', 'relatorios'];
   const showClientFilter = tabsWithFilter.includes(tab);
 
   return (
@@ -896,12 +1180,13 @@ function GodDashboard({ god, onLogout }: { god: GodUser; onLogout: () => void })
         </nav>
 
         <main className="god-main">
-          {tab === 'overview'      && <OverviewTab clientId={selectedClientId} />}
-          {tab === 'clients'       && <ClientsTab />}
-          {tab === 'users'         && <UsersTab clientId={selectedClientId} />}
-          {tab === 'relatorios'    && <RelatoriosTab clientId={selectedClientId} />}
-          {tab === 'contadores'    && <ContadoresTab />}
-          {tab === 'configuracoes' && <ConfiguracoesTab />}
+          {tab === 'overview'        && <OverviewTab clientId={selectedClientId} />}
+          {tab === 'clients'         && <ClientsTab />}
+          {tab === 'users'           && <UsersTab clientId={selectedClientId} />}
+          {tab === 'admin-members'   && <AdminMembersTab clients={clients} clientId={selectedClientId} />}
+          {tab === 'relatorios'      && <RelatoriosTab clientId={selectedClientId} />}
+          {tab === 'contadores'      && <ContadoresTab />}
+          {tab === 'configuracoes'   && <ConfiguracoesTab />}
         </main>
       </div>
     </div>

@@ -148,27 +148,41 @@ router.get('/clients', godAuthMiddleware, async (_req: Request, res: Response) =
 });
 
 router.post('/clients', godAuthMiddleware, async (req: Request, res: Response) => {
-  const { subdomain, nome, senha } = req.body as { subdomain?: string; nome?: string; senha?: string };
+  const { subdomain, nome, adminPin, adminNome } = req.body as {
+    subdomain?: string; nome?: string; adminPin?: string; adminNome?: string;
+  };
   if (!subdomain || !nome) return res.status(400).json({ error: 'subdomain e nome são obrigatórios.' });
   if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(subdomain))
     return res.status(400).json({ error: 'Subdomínio inválido.' });
+  if (!adminPin || !/^\d{4,6}$/.test(adminPin))
+    return res.status(400).json({ error: 'PIN do administrador inválido (4–6 dígitos).' });
+  if (!adminNome || adminNome.trim().length < 2)
+    return res.status(400).json({ error: 'Nome do administrador é obrigatório.' });
 
   const { data, error } = await supabase.from('clients').insert({ subdomain, nome }).select().single();
   if (error) return res.status(400).json({ error: error.message });
 
-  // Seed admin_config for the new tenant so they can log in immediately
   const newClient = data as { id: string };
-  const defaultPw = crypto.createHash('sha256')
-    .update(senha || 'admin123')
-    .digest('hex');
+
+  // Seed admin_config (legacy entry for compatibility)
   await supabase.from('admin_config').insert({
     client_id: newClient.id,
-    password_hash: defaultPw,
+    password_hash: '',
     escala_padrao: 440,
     intervalo_padrao: 60,
   });
 
-  return res.status(201).json({ ...newClient, defaultSenha: senha ? undefined : 'admin123' });
+  // Create the first administrator in usuarios table
+  await supabase.from('usuarios').insert({
+    client_id: newClient.id,
+    pin: adminPin,
+    nome: adminNome.trim(),
+    role: 'administrador',
+    horas_diarias: 440,
+    intervalo: 60,
+  });
+
+  return res.status(201).json(newClient);
 });
 
 router.patch('/clients/:id', godAuthMiddleware, async (req: Request, res: Response) => {
@@ -411,6 +425,81 @@ router.delete('/settings/senha-global', godAuthMiddleware, async (_req: Request,
     .update({ global_admin_password_hash: '', updated_at: new Date().toISOString() })
     .eq('id', 1);
   if (error) return res.status(500).json({ error: error.message });
+  return res.json({ ok: true });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN MEMBERS — administradores e membros (visão god)
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.get('/admin-members', godAuthMiddleware, async (req: Request, res: Response) => {
+  const { client_id } = req.query as Record<string, string>;
+  let query = supabase
+    .from('usuarios')
+    .select('id, pin, nome, cargo, role, ativo, created_at, client_id, clients(id, subdomain, nome)')
+    .in('role', ['administrador', 'membro'])
+    .order('nome', { ascending: true });
+  if (client_id) query = query.eq('client_id', client_id);
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json(data ?? []);
+});
+
+router.post('/admin-members', godAuthMiddleware, async (req: Request, res: Response) => {
+  const { client_id, pin, nome, cargo, role } = req.body as {
+    client_id?: string; pin?: string; nome?: string; cargo?: string; role?: string;
+  };
+  if (!client_id) return res.status(400).json({ error: 'client_id é obrigatório.' });
+  if (!pin || !/^\d{4,6}$/.test(pin)) return res.status(400).json({ error: 'PIN inválido (4–6 dígitos).' });
+  if (!nome || nome.trim().length < 2) return res.status(400).json({ error: 'Nome inválido.' });
+  const finalRole = ['administrador', 'membro'].includes(role ?? '') ? role : 'administrador';
+
+  const { count } = await supabase.from('usuarios')
+    .select('*', { count: 'exact', head: true })
+    .eq('client_id', client_id).eq('pin', pin);
+  if ((count ?? 0) > 0) return res.status(409).json({ error: 'PIN já está em uso neste cliente.' });
+
+  const { data, error } = await supabase.from('usuarios')
+    .insert({ client_id, pin, nome: nome.trim(), role: finalRole, cargo: cargo?.trim() || null, horas_diarias: 440, intervalo: 60 })
+    .select().single();
+  if (error) return res.status(400).json({ error: error.message });
+  return res.status(201).json(data);
+});
+
+router.patch('/admin-members/:id', godAuthMiddleware, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { nome, cargo, role, ativo, novoPin } = req.body as {
+    nome?: string; cargo?: string; role?: string; ativo?: boolean; novoPin?: string;
+  };
+  const updates: Record<string, unknown> = {};
+  if (nome !== undefined) updates.nome = nome.trim();
+  if (cargo !== undefined) updates.cargo = cargo.trim() || null;
+  if (role !== undefined && ['administrador', 'membro'].includes(role)) updates.role = role;
+  if (ativo !== undefined) updates.ativo = ativo;
+
+  if (novoPin !== undefined) {
+    if (!/^\d{4,6}$/.test(novoPin)) return res.status(400).json({ error: 'PIN inválido (4–6 dígitos).' });
+    const { data: existing } = await supabase.from('usuarios').select('client_id, pin').eq('id', id).single();
+    if (!existing) return res.status(404).json({ error: 'Membro não encontrado.' });
+    if (novoPin !== (existing as { pin: string }).pin) {
+      const { count } = await supabase.from('usuarios')
+        .select('*', { count: 'exact', head: true })
+        .eq('client_id', (existing as { client_id: string }).client_id)
+        .eq('pin', novoPin).neq('id', id);
+      if ((count ?? 0) > 0) return res.status(409).json({ error: 'PIN já está em uso neste cliente.' });
+      updates.pin = novoPin;
+    }
+  }
+
+  if (!Object.keys(updates).length) return res.status(400).json({ error: 'Nada para atualizar.' });
+  const { data, error } = await supabase.from('usuarios').update(updates).eq('id', id).select().single();
+  if (error) return res.status(400).json({ error: error.message });
+  return res.json(data);
+});
+
+router.delete('/admin-members/:id', godAuthMiddleware, async (req: Request, res: Response) => {
+  const { error } = await supabase.from('usuarios').delete().eq('id', req.params.id);
+  if (error) return res.status(400).json({ error: error.message });
   return res.json({ ok: true });
 });
 

@@ -283,10 +283,7 @@ export function ContadorDashboard({ nome, onLogout }: Props) {
                 onClick={() => setSelectedCliente(c)}
               >
                 <div className="cnt-client-item-main">
-                  <span className="cnt-client-nome">{c.nome}</span>
-                  <span className="cnt-client-badge">
-                    {c.connection_type === 'api_key' ? 'API' : 'UUID'}
-                  </span>
+                  <span className="cnt-client-nome">{c.nome_conexao}</span>
                 </div>
                 <button
                   className="cnt-client-remove"
@@ -347,7 +344,7 @@ export function ContadorDashboard({ nome, onLogout }: Props) {
             {/* Header */}
             <div className="cnt-report-header">
               <div className="cnt-report-title">
-                <h2>{selectedCliente.nome}</h2>
+                <h2>{selectedCliente.nome_conexao}</h2>
                 <span className="cnt-report-uuid">{selectedCliente.client_uuid}</span>
               </div>
 
@@ -447,7 +444,7 @@ export function ContadorDashboard({ nome, onLogout }: Props) {
 
       {deleteTarget && (
         <ConfirmDeleteModal
-          nome={deleteTarget.nome}
+          nome={deleteTarget.nome_conexao}
           onConfirm={() => handleDelete(deleteTarget)}
           onClose={() => setDeleteTarget(null)}
         />

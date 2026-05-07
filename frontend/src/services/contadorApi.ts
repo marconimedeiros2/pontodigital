@@ -28,7 +28,7 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
 
 export interface ContadorCliente {
   id: number;
-  nome: string;
+  nome_conexao: string;
   client_uuid: string;
   connection_type: 'uuid' | 'api_key';
   created_at: string;

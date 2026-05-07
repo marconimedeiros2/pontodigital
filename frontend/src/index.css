@@ -1,80 +1,82 @@
 /* ─── Design Tokens ─────────────────────────────────────── */
 :root {
-  --primary: #1d4ed8;
-  --primary-hover: #1e40af;
-  --primary-light: #dbeafe;
+  --primary: #FF6B35;
+  --primary-hover: #E5521C;
+  --primary-light: #FFF0EA;
   --success: #16a34a;
   --warning: #d97706;
   --danger: #dc2626;
-  --bg: #f1f5f9;
+  --bg: #FEF5EF;
   --bg-card: #ffffff;
-  --bg-header: #1e40af;
-  --text: #0f172a;
-  --text-muted: #64748b;
+  --bg-header-from: #FF4726;
+  --bg-header-to: #FF9033;
+  --text: #1a0a00;
+  --text-muted: #8a6a5a;
   --text-on-primary: #ffffff;
-  --border: #e2e8f0;
-  --shadow: 0 4px 24px rgba(0,0,0,0.08);
-  --shadow-lg: 0 8px 40px rgba(0,0,0,0.14);
+  --border: #f0d5c8;
+  --shadow: 0 4px 24px rgba(255, 107, 53, 0.10);
+  --shadow-lg: 0 8px 40px rgba(255, 107, 53, 0.18);
   --radius: 16px;
   --radius-sm: 10px;
 
-  /* Semantic Status Colors (Blue Variants) */
-  --status-primary: #2563eb;       /* Blue 600 - Registros */
-  --status-success: #0ea5e9;       /* Sky 500 - Presente */
-  --status-warning: #8b5cf6;       /* Violet 500 - Intervalo */
-  --status-danger:  #1e3a8a;       /* Blue 900 - Saída/Ausente */
+  /* Semantic Status Colors */
+  --status-primary: #FF6B35;
+  --status-success: #0ea5e9;
+  --status-warning: #f59e0b;
+  --status-danger:  #dc2626;
 
-  --badge-primary-bg: #dbeafe;     /* Blue 100 */
-  --badge-primary-text: #1e40af;   /* Blue 800 */
-  --badge-success-bg: #e0f2fe;     /* Sky 100 */
-  --badge-success-text: #0369a1;   /* Sky 700 */
-  --badge-warning-bg: #ede9fe;     /* Violet 100 */
-  --badge-warning-text: #6d28d9;   /* Violet 700 */
-  --badge-danger-bg: #bfdbfe;      /* Blue 200 */
-  --badge-danger-text: #1e3a8a;    /* Blue 900 */
+  --badge-primary-bg: #FFF0EA;
+  --badge-primary-text: #E5521C;
+  --badge-success-bg: #e0f2fe;
+  --badge-success-text: #0369a1;
+  --badge-warning-bg: #fef9c3;
+  --badge-warning-text: #a16207;
+  --badge-danger-bg: #fee2e2;
+  --badge-danger-text: #991b1b;
 
-  --keypad-btn-bg: #f8fafc;
-  --keypad-btn-hover: #e2e8f0;
-  --keypad-btn-active: #cbd5e1;
-  --pin-dot-empty: #cbd5e1;
-  --step-pending: #e2e8f0;
-  --step-text-pending: #94a3b8;
+  --keypad-btn-bg: #fff8f5;
+  --keypad-btn-hover: #ffe8dc;
+  --keypad-btn-active: #ffd5c2;
+  --pin-dot-empty: #f0d5c8;
+  --step-pending: #f0d5c8;
+  --step-text-pending: #c4907a;
 }
 
 [data-theme='dark'] {
-  --primary: #3b82f6;
-  --primary-hover: #2563eb;
-  --primary-light: #1e3a5f;
-  --bg: #0f172a;
-  --bg-card: #1e293b;
-  --bg-header: #0f172a;
-  --text: #f1f5f9;
-  --text-muted: #94a3b8;
-  --border: #334155;
-  --shadow: 0 4px 24px rgba(0,0,0,0.4);
-  --shadow-lg: 0 8px 40px rgba(0,0,0,0.6);
+  --primary: #FF7A47;
+  --primary-hover: #FF6B35;
+  --primary-light: #3a1a0a;
+  --bg: #1a0d08;
+  --bg-card: #2a1510;
+  --bg-header-from: #c43010;
+  --bg-header-to: #c4601a;
+  --text: #fdf0ea;
+  --text-muted: #c4907a;
+  --border: #4a2515;
+  --shadow: 0 4px 24px rgba(0,0,0,0.5);
+  --shadow-lg: 0 8px 40px rgba(0,0,0,0.7);
 
   /* Semantic Status Colors (Dark Mode) */
-  --status-primary: #60a5fa;       /* Blue 400 */
-  --status-success: #38bdf8;       /* Sky 400 */
-  --status-warning: #a78bfa;       /* Violet 400 */
-  --status-danger:  #93c5fd;       /* Blue 300 */
+  --status-primary: #FF9060;
+  --status-success: #38bdf8;
+  --status-warning: #fbbf24;
+  --status-danger:  #f87171;
 
-  --badge-primary-bg: #1e3a8a;     /* Blue 900 */
-  --badge-primary-text: #bfdbfe;   /* Blue 200 */
-  --badge-success-bg: #0c4a6e;     /* Sky 900 */
-  --badge-success-text: #bae6fd;   /* Sky 200 */
-  --badge-warning-bg: #4c1d95;     /* Violet 900 */
-  --badge-warning-text: #ddd6fe;   /* Violet 200 */
-  --badge-danger-bg: #172554;      /* Blue 950 */
-  --badge-danger-text: #93c5fd;    /* Blue 300 */
+  --badge-primary-bg: #3a1a0a;
+  --badge-primary-text: #ffb899;
+  --badge-success-bg: #0c4a6e;
+  --badge-success-text: #bae6fd;
+  --badge-warning-bg: #451a03;
+  --badge-warning-text: #fcd34d;
+  --badge-danger-bg: #450a0a;
+  --badge-danger-text: #fca5a5;
 
-  --keypad-btn-bg: #263350;
-  --keypad-btn-hover: #334155;
-  --keypad-btn-active: #475569;
-  --pin-dot-empty: #334155;
-  --step-pending: #1e293b;
-  --step-text-pending: #475569;
+  --keypad-btn-bg: #321810;
+  --keypad-btn-hover: #4a2515;
+  --keypad-btn-active: #5e3020;
+  --pin-dot-empty: #4a2515;
+  --step-pending: #2a1510;
+  --step-text-pending: #7a4030;
 }
 
 /* ─── Reset ─────────────────────────────────────────────── */
@@ -108,12 +110,12 @@ body {
   justify-content: space-between;
   padding: 0 20px;
   height: 60px;
-  background: var(--bg-header);
+  background: linear-gradient(135deg, var(--bg-header-from), var(--bg-header-to));
   color: white;
   position: sticky;
   top: 0;
   z-index: 10;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 16px rgba(255, 80, 0, 0.25);
 }
 
 .header-brand {
@@ -157,7 +159,10 @@ body {
   max-width: 480px;
   margin: 0 auto;
   width: 100%;
+  position: relative;
+  overflow: hidden;
 }
+
 
 /* ─── Clock ──────────────────────────────────────────────── */
 .clock {
@@ -334,7 +339,8 @@ body {
 }
 
 .keypad-btn--clear {
-  color: var(--danger);
+  color: var(--primary);
+  font-weight: 700;
 }
 
 /* Confirm Button */
@@ -347,20 +353,20 @@ body {
   height: 60px;
   font-size: 1.05rem;
   font-weight: 700;
-  background: var(--primary);
+  background: linear-gradient(135deg, var(--bg-header-from), var(--bg-header-to));
   color: white;
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+  transition: opacity 0.15s, transform 0.1s, box-shadow 0.15s;
   letter-spacing: 0.01em;
-  box-shadow: 0 4px 16px rgba(29,78,216,0.35);
+  box-shadow: 0 4px 16px rgba(255, 107, 53, 0.40);
   touch-action: manipulation;
 }
 
 .confirm-btn:hover:not(:disabled) {
-  background: var(--primary-hover);
-  box-shadow: 0 6px 20px rgba(29,78,216,0.45);
+  opacity: 0.92;
+  box-shadow: 0 6px 20px rgba(255, 107, 53, 0.50);
 }
 
 .confirm-btn:active:not(:disabled) {

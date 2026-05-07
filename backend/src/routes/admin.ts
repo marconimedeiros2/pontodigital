@@ -2,27 +2,40 @@ import { Router, Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import { db } from '../database/db';
 import { requireTenant } from '../middleware/tenant';
+import type { AdminSession } from '../types/express';
 
 const router = Router();
 
 // ── Require an active tenant for every admin route ────────────────────────────
 router.use(requireTenant);
 
-// token → clientId: garante que um token só funciona no tenant onde foi criado
-const sessions = new Map<string, string>();
+// token → SessionData
+interface SessionData extends AdminSession {}
+const sessions = new Map<string, SessionData>();
 
 function generateToken(): string {
   return crypto.randomBytes(32).toString('hex');
 }
 
-function isValidToken(token: string, clientId: string): boolean {
-  return sessions.get(token) === clientId;
+function getSession(token: string, clientId: string): SessionData | null {
+  const s = sessions.get(token);
+  return s && s.clientId === clientId ? s : null;
 }
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token || !isValidToken(token, req.client?.id ?? '')) {
+  const session = token ? getSession(token, req.client?.id ?? '') : null;
+  if (!session) {
     res.status(401).json({ error: 'Não autorizado.' });
+    return;
+  }
+  req.adminSession = session;
+  next();
+}
+
+function requireAdminRole(req: Request, res: Response, next: NextFunction): void {
+  if (req.adminSession?.role !== 'administrador') {
+    res.status(403).json({ error: 'Permissão insuficiente. Apenas administradores podem realizar esta ação.' });
     return;
   }
   next();
@@ -38,14 +51,24 @@ router.post('/login', async (req: Request, res: Response) => {
   }
 
   try {
+    // 1. Verifica se é um PIN de administrador ou membro na tabela usuarios
+    if (/^\d{4,6}$/.test(senha)) {
+      const usuario = await db.findUsuario(clientId, senha);
+      if (usuario && usuario.ativo && (usuario.role === 'administrador' || usuario.role === 'membro')) {
+        const token = generateToken();
+        sessions.set(token, { clientId, role: usuario.role, userId: usuario.id, nome: usuario.nome });
+        return res.json({ token, role: usuario.role, nome: usuario.nome });
+      }
+    }
+
+    // 2. Fallback: senha legacy via admin_config (compatibilidade)
     const ok = await db.checkPassword(clientId, senha);
     if (!ok) {
       return res.status(401).json({ error: 'Senha incorreta.' });
     }
-
     const token = generateToken();
-    sessions.set(token, clientId);
-    return res.json({ token });
+    sessions.set(token, { clientId, role: 'legacy', userId: null, nome: 'Admin' });
+    return res.json({ token, role: 'legacy', nome: 'Admin' });
   } catch (err) {
     console.error('[POST /login]', err);
     return res.status(500).json({ error: 'Erro interno.' });
@@ -440,6 +463,93 @@ router.delete('/usuarios/:pin', authMiddleware, async (req: Request, res: Respon
     return res.json({ ok: true });
   } catch (err) {
     console.error('[DELETE /usuarios/:pin]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// ── Membros (administrador + membro) ─────────────────────────────────────────
+
+// GET /api/admin/membros — lista todos (admin e membro podem ver)
+router.get('/membros', authMiddleware, async (req: Request, res: Response) => {
+  const clientId = req.client!.id;
+  try {
+    const membros = await db.findUsuariosByRoles(clientId, ['administrador', 'membro']);
+    return res.json({ membros });
+  } catch (err) {
+    console.error('[GET /membros]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// POST /api/admin/membros — cria membro/admin (apenas administrador)
+router.post('/membros', authMiddleware, requireAdminRole, async (req: Request, res: Response) => {
+  const { pin, nome, cargo, role } = req.body as { pin?: string; nome?: string; cargo?: string; role?: string };
+  const clientId = req.client!.id;
+
+  if (!pin || !/^\d{4,6}$/.test(pin)) return res.status(400).json({ error: 'PIN inválido (4-6 dígitos).' });
+  if (!nome || nome.trim().length < 2) return res.status(400).json({ error: 'Nome inválido.' });
+  if (!role || !['administrador', 'membro'].includes(role)) return res.status(400).json({ error: 'Role deve ser administrador ou membro.' });
+
+  try {
+    const existing = await db.findUsuario(clientId, pin);
+    if (existing) return res.status(409).json({ error: 'PIN já cadastrado.' });
+
+    const membro = await db.createUsuario(clientId, pin, nome.trim(), 0, 0,
+      role as 'administrador' | 'membro', cargo?.trim() || null);
+    return res.status(201).json({ membro });
+  } catch (err) {
+    console.error('[POST /membros]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// PUT /api/admin/membros/:pin — edita (apenas administrador)
+router.put('/membros/:pin', authMiddleware, requireAdminRole, async (req: Request, res: Response) => {
+  const { pin } = req.params;
+  const { nome, cargo, role, ativo, novoPin } = req.body as {
+    nome?: string; cargo?: string; role?: string; ativo?: boolean; novoPin?: string;
+  };
+  const clientId = req.client!.id;
+
+  try {
+    const existing = await db.findUsuario(clientId, pin);
+    if (!existing) return res.status(404).json({ error: 'Membro não encontrado.' });
+
+    // Muda PIN se solicitado
+    if (novoPin !== undefined) {
+      if (!/^\d{4,6}$/.test(novoPin)) return res.status(400).json({ error: 'Novo PIN inválido.' });
+      if (novoPin !== pin) {
+        const conflict = await db.findUsuario(clientId, novoPin);
+        if (conflict) return res.status(409).json({ error: 'Novo PIN já está em uso.' });
+      }
+      const updated = await db.changeUserPin(clientId, pin, novoPin, nome?.trim(), ativo);
+      return res.json({ membro: updated });
+    }
+
+    const fields: Record<string, unknown> = {};
+    if (nome  !== undefined) fields.nome  = nome.trim();
+    if (cargo !== undefined) fields.cargo = cargo?.trim() || null;
+    if (role  !== undefined && ['administrador', 'membro'].includes(role)) fields.role = role;
+    if (ativo !== undefined) fields.ativo = ativo;
+
+    const updated = await db.updateUsuario(clientId, existing.id, fields as Parameters<typeof db.updateUsuario>[2]);
+    return res.json({ membro: updated });
+  } catch (err) {
+    console.error('[PUT /membros/:pin]', err);
+    return res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// DELETE /api/admin/membros/:pin — remove (apenas administrador)
+router.delete('/membros/:pin', authMiddleware, requireAdminRole, async (req: Request, res: Response) => {
+  const { pin } = req.params;
+  const clientId = req.client!.id;
+  try {
+    const deleted = await db.deleteUsuario(clientId, pin);
+    if (!deleted) return res.status(404).json({ error: 'Membro não encontrado.' });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[DELETE /membros/:pin]', err);
     return res.status(500).json({ error: 'Erro interno.' });
   }
 });

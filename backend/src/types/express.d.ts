@@ -18,10 +18,18 @@ export interface GodUser {
   created_at: string;
 }
 
+export interface AdminSession {
+  clientId: string;
+  role: 'administrador' | 'membro' | 'legacy';
+  userId: string | null;
+  nome: string | null;
+}
+
 declare module 'express-serve-static-core' {
   interface Request {
     client: TenantClient | null;
     subdomain: string | null;
     godUser: GodUser | null;
+    adminSession: AdminSession | null;
   }
 }

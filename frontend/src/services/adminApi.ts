@@ -61,6 +61,18 @@ export interface Usuario {
   ativo: boolean;
   horas_diarias: number;
   intervalo: number;
+  role: 'usuario' | 'membro' | 'administrador';
+  cargo: string | null;
+  created_at: string;
+}
+
+export interface Membro {
+  id: string;
+  pin: string;
+  nome: string;
+  cargo: string | null;
+  role: 'administrador' | 'membro';
+  ativo: boolean;
   created_at: string;
 }
 
@@ -107,7 +119,7 @@ export interface ApiKey {
 
 export const adminApi = {
   login: (senha: string) =>
-    request<{ token: string }>(`${BASE}/login`, {
+    request<{ token: string; role: 'administrador' | 'membro' | 'legacy'; nome: string }>(`${BASE}/login`, {
       method: 'POST',
       body: JSON.stringify({ senha }),
     }),
@@ -254,7 +266,35 @@ export const adminApi = {
   revokeApiKey: (id: number) =>
     request<{ ok: boolean }>(`${BASE}/integrations/keys/${id}`, { method: 'DELETE' }),
 
+  // ── Membros ────────────────────────────────────────────────────────────────
+  listMembros: () =>
+    request<{ membros: Membro[] }>(`${BASE}/membros`),
+
+  createMembro: (pin: string, nome: string, role: 'administrador' | 'membro', cargo?: string) =>
+    request<{ membro: Membro }>(`${BASE}/membros`, {
+      method: 'POST',
+      body: JSON.stringify({ pin, nome, role, cargo }),
+    }),
+
+  updateMembro: (pin: string, data: Partial<{ nome: string; cargo: string; role: 'administrador' | 'membro'; ativo: boolean; novoPin: string }>) =>
+    request<{ membro: Membro }>(`${BASE}/membros/${pin}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteMembro: (pin: string) =>
+    request<{ ok: boolean }>(`${BASE}/membros/${pin}`, { method: 'DELETE' }),
+
   saveToken: (token: string) => sessionStorage.setItem('admin_token', token),
-  clearToken: () => sessionStorage.removeItem('admin_token'),
+  saveRole:  (role: string)  => sessionStorage.setItem('admin_role', role),
+  saveNome:  (nome: string)  => sessionStorage.setItem('admin_nome', nome),
+  clearToken: () => {
+    sessionStorage.removeItem('admin_token');
+    sessionStorage.removeItem('admin_role');
+    sessionStorage.removeItem('admin_nome');
+  },
   hasToken: () => !!sessionStorage.getItem('admin_token'),
+  getRole: (): 'administrador' | 'membro' | 'legacy' =>
+    (sessionStorage.getItem('admin_role') as 'administrador' | 'membro' | 'legacy') || 'legacy',
+  getNome: () => sessionStorage.getItem('admin_nome') || '',
 };

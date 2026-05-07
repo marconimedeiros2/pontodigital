@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { adminApi, type RegistroAdmin, type DashboardStats, type Usuario, type RegistroLog, type CustomField, type ApiKey } from '../services/adminApi';
+import { adminApi, type RegistroAdmin, type DashboardStats, type Usuario, type RegistroLog, type CustomField, type ApiKey, type Membro } from '../services/adminApi';
 import { STEP_LABELS } from '../types';
 import { exportToXlsx } from '../utils/exportXlsx';
 
@@ -1563,6 +1563,8 @@ function IntegrationsTab() {
 
 export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [tab, setTab] = useState<AdminTab>('dashboard');
+  const adminRole = adminApi.getRole();
+  const adminNome = adminApi.getNome();
   const [showPins, setShowPins] = useState(false);
 
   // Dashboard state
@@ -1637,7 +1639,22 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [intervaloPadrao, setIntervaloPadrao] = useState('1:00');
   const [escalaMsg, setEscalaMsg] = useState('');
   const [escalaError, setEscalaError] = useState('');
-  const [configTab, setConfigTab] = useState<'escala' | 'senha' | 'colunas' | 'integracoes'>('escala');
+  const [configTab, setConfigTab] = useState<'membros' | 'escala' | 'senha' | 'colunas' | 'integracoes'>('membros');
+
+  // Membros state
+  const [membros, setMembros] = useState<Membro[]>([]);
+  const [membrosLoading, setMembrosLoading] = useState(false);
+  const [membrosError, setMembrosError] = useState('');
+  const [editingMembro, setEditingMembro] = useState<Membro | null>(null);
+  const [creatingMembro, setCreatingMembro] = useState(false);
+  const [mDeletePin, setMDeletePin]     = useState<string | null>(null);
+  const [mfPin, setMfPin]           = useState('');
+  const [mfNome, setMfNome]         = useState('');
+  const [mfCargo, setMfCargo]       = useState('');
+  const [mfRole, setMfRole]         = useState<'administrador' | 'membro'>('membro');
+  const [mfAtivo, setMfAtivo]       = useState(true);
+  const [mfNovoPin, setMfNovoPin]   = useState('');
+  const [mSaving, setMSaving]       = useState(false);
 
   const loadDashboard = useCallback(async () => {
     setDashLoading(true);
@@ -1659,8 +1676,22 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     } catch { /* ignore */ } finally { setUsuariosLoading(false); }
   }, []);
 
+  const loadMembros = useCallback(async () => {
+    setMembrosLoading(true);
+    setMembrosError('');
+    try {
+      const data = await adminApi.listMembros();
+      setMembros(data.membros);
+    } catch (e) {
+      setMembrosError(e instanceof Error ? e.message : 'Erro ao carregar membros');
+    } finally {
+      setMembrosLoading(false);
+    }
+  }, []);
+
   useEffect(() => { if (tab === 'dashboard') loadDashboard(); }, [tab, loadDashboard]);
   useEffect(() => { if (tab === 'usuarios') loadUsuarios(); }, [tab, loadUsuarios]);
+  useEffect(() => { if (tab === 'configuracoes' && configTab === 'membros') loadMembros(); }, [tab, configTab, loadMembros]);
   useEffect(() => { adminApi.listCustomFields(true).then((r) => setCustomFields(r.fields)).catch(() => {}); }, []);
 
   useEffect(() => {
@@ -1923,7 +1954,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
           </div>
           <div className="admin-sidebar-brand-text">
             <span className="admin-sidebar-brand-name">tempu</span>
-            <span className="admin-sidebar-brand-sub">Painel Gerencial</span>
+            <span className="admin-sidebar-brand-sub">{adminNome || 'Painel Gerencial'}</span>
           </div>
         </div>
 
@@ -2605,7 +2636,13 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
             <div className="admin-section-header"><h2>Configurações</h2></div>
 
             <div className="config-tabs" style={{ display: 'flex', gap: 16, marginBottom: 24, borderBottom: '1px solid var(--border)', paddingBottom: 0 }}>
-              <button 
+              <button
+                style={{ background: 'none', border: 'none', padding: '8px 16px', cursor: 'pointer', fontWeight: 600, fontSize: '0.95rem', color: configTab === 'membros' ? 'var(--status-primary)' : 'var(--text-muted)', borderBottom: configTab === 'membros' ? '2px solid var(--status-primary)' : '2px solid transparent', transition: 'all 0.2s' }}
+                onClick={() => setConfigTab('membros')}
+              >
+                Equipe
+              </button>
+              <button
                 style={{ background: 'none', border: 'none', padding: '8px 16px', cursor: 'pointer', fontWeight: 600, fontSize: '0.95rem', color: configTab === 'escala' ? 'var(--status-primary)' : 'var(--text-muted)', borderBottom: configTab === 'escala' ? '2px solid var(--status-primary)' : '2px solid transparent', transition: 'all 0.2s' }}
                 onClick={() => setConfigTab('escala')}
               >
@@ -2630,6 +2667,349 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                 Integrações
               </button>
             </div>
+
+            {configTab === 'membros' && (
+              <div className="admin-card">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                  <div>
+                    <h3 className="admin-card-title" style={{ marginBottom: 4 }}>Equipe Administrativa</h3>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                      {adminRole === 'administrador'
+                        ? 'Gerencie administradores e membros com acesso ao painel.'
+                        : 'Membros com acesso ao painel gerencial.'}
+                    </p>
+                  </div>
+                  {adminRole === 'administrador' && (
+                    <button
+                      className="confirm-btn"
+                      style={{ padding: '8px 16px', fontSize: '0.88rem', whiteSpace: 'nowrap' }}
+                      onClick={() => {
+                        setMfPin(''); setMfNome(''); setMfCargo(''); setMfRole('membro'); setMfAtivo(true); setMfNovoPin('');
+                        setCreatingMembro(true);
+                      }}
+                    >
+                      + Novo membro
+                    </button>
+                  )}
+                </div>
+
+                {membrosLoading && (
+                  <div style={{ textAlign: 'center', padding: 32 }}>
+                    <span className="spinner" />
+                  </div>
+                )}
+                {membrosError && (
+                  <div className="error-banner" style={{ marginBottom: 16 }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    {membrosError}
+                  </div>
+                )}
+                {!membrosLoading && !membrosError && membros.length === 0 && (
+                  <div className="admin-empty">Nenhum membro cadastrado.</div>
+                )}
+                {!membrosLoading && membros.length > 0 && (
+                  <div className="admin-table-wrap">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>Nome</th>
+                          <th>PIN</th>
+                          <th>Cargo</th>
+                          <th>Papel</th>
+                          <th>Status</th>
+                          {adminRole === 'administrador' && <th style={{ width: 80 }}></th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {membros.map((m) => (
+                          <tr key={m.pin}>
+                            <td style={{ fontWeight: 600 }}>
+                              {m.nome}
+                              {m.pin === adminApi.getNome() ? null : null}
+                            </td>
+                            <td>
+                              <span style={{ fontFamily: 'monospace', background: 'var(--bg)', padding: '2px 8px', borderRadius: 4, fontSize: '0.88rem' }}>
+                                {m.pin}
+                              </span>
+                            </td>
+                            <td style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                              {m.cargo || <span style={{ opacity: 0.4 }}>—</span>}
+                            </td>
+                            <td>
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 4,
+                                padding: '2px 10px', borderRadius: 20, fontSize: '0.8rem', fontWeight: 700,
+                                background: m.role === 'administrador' ? 'rgba(139,92,246,0.12)' : 'rgba(59,130,246,0.12)',
+                                color: m.role === 'administrador' ? '#7c3aed' : '#2563eb',
+                              }}>
+                                {m.role === 'administrador' ? '⭐ Administrador' : '👤 Membro'}
+                              </span>
+                            </td>
+                            <td>
+                              <span style={{
+                                display: 'inline-flex', padding: '2px 10px', borderRadius: 20, fontSize: '0.8rem', fontWeight: 700,
+                                background: m.ativo ? 'rgba(16,185,129,0.12)' : 'rgba(107,114,128,0.12)',
+                                color: m.ativo ? '#059669' : '#6b7280',
+                              }}>
+                                {m.ativo ? 'Ativo' : 'Inativo'}
+                              </span>
+                            </td>
+                            {adminRole === 'administrador' && (
+                              <td>
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                  <button
+                                    title="Editar"
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, borderRadius: 4 }}
+                                    onClick={() => {
+                                      setEditingMembro(m);
+                                      setMfPin(m.pin); setMfNome(m.nome); setMfCargo(m.cargo || '');
+                                      setMfRole(m.role); setMfAtivo(m.ativo); setMfNovoPin(m.pin);
+                                    }}
+                                  >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                    </svg>
+                                  </button>
+                                  <button
+                                    title="Excluir"
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4, borderRadius: 4 }}
+                                    onClick={() => setMDeletePin(m.pin)}
+                                  >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                                      <path d="M10 11v6"/><path d="M14 11v6"/>
+                                      <path d="M9 6V4h6v2"/>
+                                    </svg>
+                                  </button>
+                                </div>
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* ── Create membro modal ── */}
+                {creatingMembro && (
+                  <div className="modal-overlay" onClick={() => setCreatingMembro(false)}>
+                    <div className="modal-card" style={{ textAlign: 'left', maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
+                      <h2 className="modal-title" style={{ textAlign: 'left', fontSize: '1.1rem', marginBottom: 20 }}>Novo Membro</h2>
+                      <div className="input-group" style={{ marginBottom: 14 }}>
+                        <label className="input-label">PIN (4–6 dígitos)</label>
+                        <input type="tel" inputMode="numeric" maxLength={6} className="text-input"
+                          value={mfPin} onChange={(e) => setMfPin(e.target.value.replace(/\D/g, ''))} placeholder="Ex: 9999" />
+                      </div>
+                      <div className="input-group" style={{ marginBottom: 14 }}>
+                        <label className="input-label">Nome</label>
+                        <input type="text" className="text-input"
+                          value={mfNome} onChange={(e) => setMfNome(e.target.value)} placeholder="Nome completo" />
+                      </div>
+                      <div className="input-group" style={{ marginBottom: 14 }}>
+                        <label className="input-label">Cargo <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(opcional)</span></label>
+                        <input type="text" className="text-input"
+                          value={mfCargo} onChange={(e) => setMfCargo(e.target.value)} placeholder="Ex: Gerente" />
+                      </div>
+                      <div className="input-group" style={{ marginBottom: 20 }}>
+                        <label className="input-label">Papel</label>
+                        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                          {(['membro', 'administrador'] as const).map((r) => (
+                            <button key={r} type="button"
+                              onClick={() => setMfRole(r)}
+                              style={{
+                                flex: 1, height: 40, borderRadius: 8,
+                                border: `2px solid ${mfRole === r ? 'var(--primary)' : 'var(--border)'}`,
+                                background: mfRole === r ? 'var(--primary-light)' : 'var(--bg-card)',
+                                color: mfRole === r ? 'var(--primary)' : 'var(--text-muted)',
+                                fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.15s',
+                              }}
+                            >
+                              {r === 'administrador' ? '⭐ Administrador' : '👤 Membro'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      {membrosError && (
+                        <div className="error-banner" style={{ marginBottom: 14 }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                          </svg>
+                          {membrosError}
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        <button className="confirm-btn"
+                          style={{ background: 'var(--keypad-btn-bg)', color: 'var(--text)', boxShadow: 'none', border: '1px solid var(--border)', flex: 1 }}
+                          onClick={() => { setCreatingMembro(false); setMembrosError(''); }} disabled={mSaving}>
+                          Cancelar
+                        </button>
+                        <button className="confirm-btn" style={{ flex: 1 }} disabled={mSaving}
+                          onClick={async () => {
+                            setMembrosError('');
+                            if (!/^\d{4,6}$/.test(mfPin)) { setMembrosError('PIN deve ter 4–6 dígitos.'); return; }
+                            if (!mfNome.trim()) { setMembrosError('Nome é obrigatório.'); return; }
+                            setMSaving(true);
+                            try {
+                              await adminApi.createMembro(mfPin, mfNome, mfRole, mfCargo || undefined);
+                              setCreatingMembro(false);
+                              await loadMembros();
+                            } catch (e) { setMembrosError(e instanceof Error ? e.message : 'Erro ao criar'); }
+                            finally { setMSaving(false); }
+                          }}>
+                          {mSaving ? <span className="spinner" /> : 'Criar'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Edit membro modal ── */}
+                {editingMembro && (
+                  <div className="modal-overlay" onClick={() => { setEditingMembro(null); setMembrosError(''); }}>
+                    <div className="modal-card" style={{ textAlign: 'left', maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
+                      <h2 className="modal-title" style={{ textAlign: 'left', fontSize: '1.1rem', marginBottom: 20 }}>Editar Membro</h2>
+                      <div className="input-group" style={{ marginBottom: 14 }}>
+                        <label className="input-label">Novo PIN</label>
+                        <input type="tel" inputMode="numeric" maxLength={6} className="text-input"
+                          value={mfNovoPin} onChange={(e) => setMfNovoPin(e.target.value.replace(/\D/g, ''))} />
+                        {mfNovoPin !== editingMembro.pin && (
+                          <p style={{ fontSize: '0.78rem', color: '#d97706', marginTop: 4, fontWeight: 500 }}>⚠️ O PIN de acesso será alterado.</p>
+                        )}
+                      </div>
+                      <div className="input-group" style={{ marginBottom: 14 }}>
+                        <label className="input-label">Nome</label>
+                        <input type="text" className="text-input"
+                          value={mfNome} onChange={(e) => setMfNome(e.target.value)} />
+                      </div>
+                      <div className="input-group" style={{ marginBottom: 14 }}>
+                        <label className="input-label">Cargo <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(opcional)</span></label>
+                        <input type="text" className="text-input"
+                          value={mfCargo} onChange={(e) => setMfCargo(e.target.value)} placeholder="Ex: Gerente" />
+                      </div>
+                      <div className="input-group" style={{ marginBottom: 14 }}>
+                        <label className="input-label">Papel</label>
+                        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                          {(['membro', 'administrador'] as const).map((r) => (
+                            <button key={r} type="button"
+                              onClick={() => setMfRole(r)}
+                              style={{
+                                flex: 1, height: 40, borderRadius: 8,
+                                border: `2px solid ${mfRole === r ? 'var(--primary)' : 'var(--border)'}`,
+                                background: mfRole === r ? 'var(--primary-light)' : 'var(--bg-card)',
+                                color: mfRole === r ? 'var(--primary)' : 'var(--text-muted)',
+                                fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.15s',
+                              }}
+                            >
+                              {r === 'administrador' ? '⭐ Administrador' : '👤 Membro'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="input-group" style={{ marginBottom: 20 }}>
+                        <label className="input-label">Status</label>
+                        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                          {[true, false].map((val) => (
+                            <button key={String(val)} type="button"
+                              onClick={() => setMfAtivo(val)}
+                              style={{
+                                flex: 1, height: 40, borderRadius: 8,
+                                border: `2px solid ${mfAtivo === val ? 'var(--primary)' : 'var(--border)'}`,
+                                background: mfAtivo === val ? 'var(--primary-light)' : 'var(--bg-card)',
+                                color: mfAtivo === val ? 'var(--primary)' : 'var(--text-muted)',
+                                fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.15s',
+                              }}
+                            >
+                              {val ? 'Ativo' : 'Inativo'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      {membrosError && (
+                        <div className="error-banner" style={{ marginBottom: 14 }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                          </svg>
+                          {membrosError}
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        <button className="confirm-btn"
+                          style={{ background: 'var(--keypad-btn-bg)', color: 'var(--text)', boxShadow: 'none', border: '1px solid var(--border)', flex: 1 }}
+                          onClick={() => { setEditingMembro(null); setMembrosError(''); }} disabled={mSaving}>
+                          Cancelar
+                        </button>
+                        <button className="confirm-btn" style={{ flex: 1 }} disabled={mSaving}
+                          onClick={async () => {
+                            setMembrosError('');
+                            if (!/^\d{4,6}$/.test(mfNovoPin)) { setMembrosError('PIN deve ter 4–6 dígitos.'); return; }
+                            if (!mfNome.trim()) { setMembrosError('Nome é obrigatório.'); return; }
+                            setMSaving(true);
+                            try {
+                              await adminApi.updateMembro(editingMembro.pin, {
+                                nome: mfNome,
+                                cargo: mfCargo || undefined,
+                                role: mfRole,
+                                ativo: mfAtivo,
+                                ...(mfNovoPin !== editingMembro.pin ? { novoPin: mfNovoPin } : {}),
+                              });
+                              setEditingMembro(null);
+                              await loadMembros();
+                            } catch (e) { setMembrosError(e instanceof Error ? e.message : 'Erro ao salvar'); }
+                            finally { setMSaving(false); }
+                          }}>
+                          {mSaving ? <span className="spinner" /> : 'Salvar'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Delete confirmation ── */}
+                {mDeletePin && (
+                  <div className="modal-overlay" onClick={() => setMDeletePin(null)}>
+                    <div className="modal-card" style={{ maxWidth: 360 }} onClick={(e) => e.stopPropagation()}>
+                      <h2 className="modal-title" style={{ fontSize: '1.05rem' }}>Remover membro?</h2>
+                      <p style={{ color: 'var(--text-muted)', marginBottom: 24, fontSize: '0.9rem' }}>
+                        Esta ação removerá o acesso ao painel. Os registros de ponto não serão afetados.
+                      </p>
+                      {membrosError && (
+                        <div className="error-banner" style={{ marginBottom: 14 }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                          </svg>
+                          {membrosError}
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        <button className="confirm-btn"
+                          style={{ background: 'var(--keypad-btn-bg)', color: 'var(--text)', boxShadow: 'none', border: '1px solid var(--border)', flex: 1 }}
+                          onClick={() => { setMDeletePin(null); setMembrosError(''); }} disabled={mSaving}>
+                          Cancelar
+                        </button>
+                        <button className="confirm-btn"
+                          style={{ flex: 1, background: '#ef4444' }} disabled={mSaving}
+                          onClick={async () => {
+                            setMembrosError('');
+                            setMSaving(true);
+                            try {
+                              await adminApi.deleteMembro(mDeletePin);
+                              setMDeletePin(null);
+                              await loadMembros();
+                            } catch (e) { setMembrosError(e instanceof Error ? e.message : 'Erro ao remover'); }
+                            finally { setMSaving(false); }
+                          }}>
+                          {mSaving ? <span className="spinner" /> : 'Remover'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {configTab === 'escala' && (
               <div className="admin-card">

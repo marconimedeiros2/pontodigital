@@ -100,15 +100,17 @@ export default function App() {
     setError('');
 
     try {
-      // Tenta login de admin primeiro — silencioso se falhar
+      // Tenta login de admin/membro primeiro — silencioso se falhar
       try {
-        const { token } = await adminApi.login(pin);
+        const { token, role, nome } = await adminApi.login(pin);
         adminApi.saveToken(token);
+        adminApi.saveRole(role);
+        adminApi.saveNome(nome);
         setPin('');
         setView('admin');
         return;
       } catch {
-        // Não é o PIN do admin, segue para registro de ponto
+        // Não é o PIN de admin/membro, segue para registro de ponto
       }
 
       // Registro de ponto normal

@@ -26,6 +26,8 @@ export interface Usuario {
   ativo: boolean;
   horas_diarias: number;
   intervalo: number;
+  role: 'usuario' | 'membro' | 'administrador';
+  cargo: string | null;
   created_at: string;
 }
 
@@ -266,6 +268,7 @@ export const db = {
       .from('usuarios')
       .select('*')
       .eq('client_id', clientId)
+      .eq('role', 'usuario')
       .order('nome', { ascending: true });
     if (error) raise(error, 'listUsuarios');
     return (data ?? []) as Usuario[];
@@ -282,14 +285,30 @@ export const db = {
     return data ?? undefined;
   },
 
-  async createUsuario(clientId: string, pin: string, nome: string, horasDiarias = 440, intervalo = 60): Promise<Usuario> {
+  async createUsuario(
+    clientId: string, pin: string, nome: string,
+    horasDiarias = 440, intervalo = 60,
+    role: 'usuario' | 'membro' | 'administrador' = 'usuario',
+    cargo: string | null = null
+  ): Promise<Usuario> {
     const { data, error } = await supabase
       .from('usuarios')
-      .insert({ client_id: clientId, pin, nome, ativo: true, horas_diarias: horasDiarias, intervalo })
+      .insert({ client_id: clientId, pin, nome, ativo: true, horas_diarias: horasDiarias, intervalo, role, cargo })
       .select()
       .single();
     if (error) raise(error, 'createUsuario');
     return data as Usuario;
+  },
+
+  async findUsuariosByRoles(clientId: string, roles: string[]): Promise<Usuario[]> {
+    const { data, error } = await supabase
+      .from('usuarios')
+      .select('*')
+      .eq('client_id', clientId)
+      .in('role', roles)
+      .order('nome', { ascending: true });
+    if (error) raise(error, 'findUsuariosByRoles');
+    return (data ?? []) as Usuario[];
   },
 
   async bulkUpdateHorasDiarias(clientId: string, pins: string[], horasDiarias: number): Promise<void> {

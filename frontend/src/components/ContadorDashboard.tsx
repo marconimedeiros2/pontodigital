@@ -1,10 +1,26 @@
 import { useState, useEffect, useCallback } from 'react';
+import * as XLSX from 'xlsx';
 import { contadorApi, ContadorCliente, RegistroContador } from '../services/contadorApi';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
+function extractTime(t: string): string {
+  // Handle full ISO datetime "2026-05-07T08:30:00" or "2026-05-07 08:30:00"
+  // Apply UTC-3 offset if it's a full datetime
+  if (t.includes('T') || (t.length > 8 && t.includes(' '))) {
+    const iso = t.includes('T') ? t : t.replace(' ', 'T');
+    const date = new Date(iso.endsWith('Z') ? iso : iso + 'Z');
+    const h = date.getUTCHours() - 3;
+    const adjustedH = ((h % 24) + 24) % 24;
+    const m = date.getUTCMinutes();
+    const s = date.getUTCSeconds();
+    return `${String(adjustedH).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+  return t;
+}
+
 function displayTime(t: string | null): string {
   if (!t) return '—';
-  return t.slice(0, 5);
+  return extractTime(t).slice(0, 5);
 }
 
 function fmtDate(d: string): string {
@@ -15,7 +31,8 @@ function fmtDate(d: string): string {
 function calcWorked(r: RegistroContador): string {
   if (!r.hora_inicial || !r.hora_final) return '—';
   const toMin = (t: string) => {
-    const [h, m] = t.split(':').map(Number);
+    const clean = extractTime(t);
+    const [h, m] = clean.split(':').map(Number);
     return h * 60 + m;
   };
   let total = toMin(r.hora_final) - toMin(r.hora_inicial);
@@ -30,6 +47,33 @@ function calcWorked(r: RegistroContador): string {
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function exportXlsx(registros: RegistroContador[], clienteNome: string, inicio: string, fim: string): void {
+  const rows = registros.map((r) => ({
+    'Funcionário': r.nome,
+    'Data': fmtDate(r.data),
+    'Entrada': displayTime(r.hora_inicial),
+    'Iní. Intervalo': displayTime(r.inicio_intervalo),
+    'Fim Intervalo': displayTime(r.fim_intervalo),
+    'Saída': displayTime(r.hora_final),
+    'Total': calcWorked(r),
+    'Status': r.completo ? 'Completo' : 'Incompleto',
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+
+  // Column widths
+  ws['!cols'] = [
+    { wch: 22 }, { wch: 12 }, { wch: 10 }, { wch: 14 },
+    { wch: 14 }, { wch: 10 }, { wch: 8 }, { wch: 12 },
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Registros');
+
+  const filename = `ponto_${clienteNome.replace(/\s+/g, '_')}_${inicio}_${fim}.xlsx`;
+  XLSX.writeFile(wb, filename);
 }
 
 function thirtyDaysAgo(): string {
@@ -436,7 +480,7 @@ export function ContadorDashboard({ nome, onLogout }: Props) {
                 <span className="cnt-report-uuid">{selectedCliente.client_uuid}</span>
               </div>
 
-              {/* Date range */}
+              {/* Date range + export */}
               <div className="cnt-date-range">
                 <label className="cnt-label">De</label>
                 <input
@@ -455,6 +499,19 @@ export function ContadorDashboard({ nome, onLogout }: Props) {
                   max={today()}
                   onChange={(e) => setFim(e.target.value)}
                 />
+                <button
+                  className="cnt-btn cnt-btn--export"
+                  disabled={registros.length === 0}
+                  onClick={() => exportXlsx(registros, selectedCliente.nome_conexao, inicio, fim)}
+                  title="Exportar para Excel"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Exportar XLSX
+                </button>
               </div>
             </div>
 

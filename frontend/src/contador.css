@@ -147,6 +147,9 @@
 .cnt-btn--ghost:hover:not(:disabled) { background: var(--bg, #f5f6fa); color: var(--text, #1a1a2e); }
 .cnt-btn--danger { background: #e03e3e; color: #fff; }
 .cnt-btn--danger:hover:not(:disabled) { background: #c93232; }
+.cnt-btn--export { background: #16a34a; color: #fff; border-color: #16a34a; gap: 6px; }
+.cnt-btn--export:hover:not(:disabled) { background: #15803d; border-color: #15803d; }
+.cnt-btn--export:disabled { opacity: 0.45; cursor: not-allowed; }
 .cnt-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ─── Dashboard layout ───────────────────────────────────── */

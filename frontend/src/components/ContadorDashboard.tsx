@@ -384,7 +384,7 @@ export function ContadorDashboard({ nome, onLogout }: Props) {
             </svg>
           </div>
           <div className="cnt-sidebar-brand-text">
-            <span className="cnt-sidebar-brand-name">Ponto Digital</span>
+            <span className="cnt-sidebar-brand-name">Tempu</span>
             <span className="cnt-sidebar-brand-sub">Área do Contador</span>
           </div>
         </div>

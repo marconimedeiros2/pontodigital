@@ -635,23 +635,45 @@ function LogsModal({ registroId, nomeFuncionario, onClose }: {
           {!loading && filtered.length > 0 && (
             <ul className="logs-list">
               {filtered.map((log) => (
-                <li key={log.id} className={`log-entry${log.tipo === 'custom' ? ' log-entry--custom' : ''}`}>
+                <li
+                  key={log.id}
+                  className={[
+                    'log-entry',
+                    log.tipo === 'custom' ? 'log-entry--custom' : '',
+                    log.alterado_por && log.alterado_por !== 'admin' ? 'log-entry--pin' : '',
+                  ].filter(Boolean).join(' ')}
+                >
                   <div className="log-entry__main">
                     <span className="log-entry__campo">{campoLabel(log)}</span>
                     {log.tipo === 'custom' && (
                       <span className="log-entry__badge">personalizado</span>
                     )}
-                    {' alterado de '}
-                    <span className="log-entry__valor log-entry__valor--old">
-                      {formatLogValue(log.campo, log.valor_anterior)}
-                    </span>
-                    {' para '}
+                    {log.valor_anterior === null && log.alterado_por !== 'admin'
+                      ? ' registrado: '
+                      : ' alterado de '}
+                    {log.valor_anterior !== null && (
+                      <>
+                        <span className="log-entry__valor log-entry__valor--old">
+                          {formatLogValue(log.campo, log.valor_anterior)}
+                        </span>
+                        {' para '}
+                      </>
+                    )}
                     <span className="log-entry__valor log-entry__valor--new">
                       {formatLogValue(log.campo, log.valor_novo)}
                     </span>
                   </div>
                   <div className="log-entry__meta">
-                    {formatLogDate(log.alterado_em)}
+                    {log.alterado_por && log.alterado_por !== 'admin' ? (
+                      <span className="log-entry__autor log-entry__autor--pin" title="Registro via PIN pelo funcionário">
+                        📍 {log.alterado_por}
+                      </span>
+                    ) : (
+                      <span className="log-entry__autor log-entry__autor--admin" title="Editado pelo administrador">
+                        ✏️ Admin
+                      </span>
+                    )}
+                    <span className="log-entry__date">{formatLogDate(log.alterado_em)}</span>
                   </div>
                 </li>
               ))}

@@ -91,6 +91,16 @@ router.post('/registrar', async (req: Request, res: Response) => {
     const tipo = nextStep ?? 'hora_inicial';
     const nextAfter = getNextStep(updated);
 
+    // Registra log da etapa concluída pelo funcionário via PIN
+    db.insertLog(
+      updated.id,
+      tipo,
+      null,
+      horaDisplay,
+      `${usuario.nome}`,
+      'default'
+    ).catch((e) => console.error('[ponto log]', e));
+
     return res.json({
       success: true,
       tipo,

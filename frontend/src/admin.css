@@ -1367,6 +1367,38 @@ code {
 .log-entry__meta {
   font-size: 0.77rem;
   color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.log-entry__autor {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.log-entry__autor--pin {
+  background: #fef9c3;
+  color: #854d0e;
+}
+.log-entry__autor--admin {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+.log-entry__date {
+  color: var(--text-muted);
+  font-size: 0.77rem;
+}
+
+/* Registro via PIN — destaque sutil na borda esquerda */
+.log-entry--pin {
+  border-left: 3px solid #fbbf24;
+  padding-left: 8px;
 }
 
 /* ─── Logs Filter ─────────────────────────────────────────── */
